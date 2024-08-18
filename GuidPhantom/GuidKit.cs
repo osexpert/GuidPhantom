@@ -81,7 +81,6 @@ namespace GuidPhantom
 		/// </summary>
 		/// <param name="safe">true if generated safely (will be globally unique). false is generated unsafely (only locally unique)</param>
 		/// <returns>Version 1 Guid</returns>
-		/// <exception cref="Exception"></exception>
 		public static Guid CreateVersion1(out bool safe)
 		{
 			// <param name="check_safe">If true, will throw is Guid is not generated safely (eg. not with a valid mac address, not with a reliable sequence etc.)</param>
@@ -299,7 +298,6 @@ namespace GuidPhantom
 		/// </summary>
 		/// <param name="timestamp"></param>
 		/// <returns>Version 7 Guid</returns>
-		/// <exception cref="ArgumentOutOfRangeException"></exception>
 		public static Guid CreateVersion7(DateTimeOffset timestamp)
 		{
 			//          if (_createVersion7_dto.Value != null)
@@ -464,7 +462,6 @@ namespace GuidPhantom
 		/// </summary>
 		/// <param name="timestamp"></param>
 		/// <returns>Version8MsSql Guid</returns>
-		/// <exception cref="ArgumentOutOfRangeException"></exception>
 		public static Guid CreateVersion8MsSql(DateTimeOffset timestamp)
 		{
 			//            if (_createVersion7_dto.Value != null)
@@ -493,8 +490,6 @@ namespace GuidPhantom
 		/// </summary>
 		/// <param name="unix_ts_ms"></param>
 		/// <returns>Version8MsSql Guid</returns>
-		/// <exception cref="ArgumentOutOfRangeException"></exception>
-		/// <exception cref="InvalidOperationException"></exception>
 		private static Guid CreateVersion8MsSql(long unix_ts_ms, ref short sequence, bool setSequence)
 		{
 			if (unix_ts_ms < 0)
@@ -617,7 +612,6 @@ namespace GuidPhantom
 		/// <param name="a"></param>
 		/// <param name="b"></param>
 		/// <returns>Xor Guid</returns>
-		/// <exception cref="NotImplementedException"></exception>
 		public static Guid CreateXorGuid(this Guid a, Guid b)
 		{
 			var a_bytes = a.ToByteArray(bigEndian: true);
@@ -629,7 +623,7 @@ namespace GuidPhantom
 				throw new InvalidOperationException("b is not variant " + GuidVariant.IETF);
 
 			byte[] bytes = new byte[16];
-			for (int i = 0; i < 16; i++)
+			for (int i = 0; i <= 15; i++)
 				bytes[i] = (byte)(a_bytes[i] ^ b_bytes[i]);
 
 			// Sanity
@@ -645,7 +639,6 @@ namespace GuidPhantom
 		/// <param name="xorGuid"></param>
 		/// <param name="a_or_b"></param>
 		/// <returns>Opposite of a_or_b. If a_or_b is a, b is returned. If a_or_b is b, a is returned.</returns>
-		/// <exception cref="NotImplementedException"></exception>
 		public static Guid ReverseXorGuid(this Guid xorGuid, Guid a_or_b)
 		{
 			var xor_bytes = xorGuid.ToByteArray(bigEndian: true);
@@ -657,7 +650,7 @@ namespace GuidPhantom
 				throw new InvalidOperationException("a_or_b is not variant " + GuidVariant.IETF);
 
 			byte[] bytes = new byte[16];
-			for (int i = 0; i < 16; i++)
+			for (int i = 0; i <= 15; i++)
 				bytes[i] = (byte)(xor_bytes[i] ^ a_or_b_bytes[i]);
 
 			// Sanity
@@ -673,7 +666,6 @@ namespace GuidPhantom
 		/// <param name="g"></param>
 		/// <param name="verify_version"></param>
 		/// <returns></returns>
-		/// <exception cref="InvalidOperationException"></exception>
 		private static Guid SwapVersion7And8MsSql(this Guid g, byte verify_version)//, bool swap_rand_a = true)
 		{
 			// <param name="swap_rand_a">Swap the 12 bits (OPTIONAL sub milliseconds) in octets 6-7</param>
@@ -875,7 +867,6 @@ namespace GuidPhantom
 		/// <param name="g"></param>
 		/// <param name="version8type"></param>
 		/// <returns>Info about the Guid</returns>
-		/// <exception cref="Exception"></exception>
 		public static GuidInfo GetGuidInfo(this Guid g, GuidVersion8Type version8type = GuidVersion8Type.Unknown)
 		{
 			var b = g.ToByteArray(bigEndian: true);
@@ -975,7 +966,6 @@ namespace GuidPhantom
 		/// <param name="g_incremented"></param>
 		/// <param name="g_base"></param>
 		/// <returns>The increment used when creating the incremented Guid</returns>
-		/// <exception cref="Exception"></exception>
 		public static int ReverseIncrementedGuid(this Guid g_incremented, Guid g_base)
 		{
 			var base_bytes = g_base.ToByteArray(bigEndian: true);

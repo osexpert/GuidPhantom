@@ -1,0 +1,46 @@
+<Project>
+  <PropertyGroup>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <LangVersion>Latest</LangVersion>
+    <NoWarn>1701;1702;1591;1573</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+<!--
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)\keypair.key</AssemblyOriginatorKeyFile>
+    -->
+    <RepoRootPath>$(MSBuildThisFileDirectory)</RepoRootPath>
+    <PackageOutputPath>$(RepoRootPath)bin\Packages\$(Configuration)\NuGet\</PackageOutputPath>
+
+    <PackageProjectUrl>https://github.com/osexpert/GuidPhantom</PackageProjectUrl>
+    <PackageLicenseUrl></PackageLicenseUrl>
+    <RepositoryUrl>https://github.com/osexpert/GuidPhantom.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes></PackageReleaseNotes>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Company>osexpert</Company>      
+    <PackageReleaseNotes>See https://github.com/osexpert/GuidPhantom/blob/master/CHANGELOG.md for details</PackageReleaseNotes>
+    
+    <VersionPrefix>0.0.1</VersionPrefix>
+    <PackageTags>GuidKit</PackageTags>
+    <Description>Create Guid v1,v3,v5,v6,v7,v8MsSql,v8SHA256,v8SHA512,NEWSEQUENTIALID,XorGuid,NumericGuid,IncrementedGuid. Convert between v1 and v6. Convert between v7 and v8MsSql. Create monotonic sequence of v7 and v8MsSql Guid's. Get Guid info.</Description>        
+		        
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+		              
+<!--
+
+
+    
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols Condition=" '$(DebugType)' != 'embedded' ">true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    
+    -->
+    
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(RepoRootPath)README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
+    
+</Project>

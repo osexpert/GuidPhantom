@@ -773,7 +773,6 @@ namespace GuidPhantom
 			var bytes_9 = bytes[9];
 
 			const byte newVer = 8;
-
 			bytes[8] = (byte)(bytes_8 & 0b1100_0000 | (bytes_6 << 2) & 0b0011_1100 | (bytes_7 >> 6) & 0b0000_0011);
 			bytes[9] = (byte)((bytes_7 << 2) & 0b1111_1100 | (bytes_8 >> 4) & 0b000_0011);
 			bytes[7] = (byte)((bytes_8 << 4) & 0b1111_0000 | (bytes_9 >> 4) & 0b0000_1111);
@@ -814,7 +813,6 @@ namespace GuidPhantom
 		/// Fake a Guid with digits 0-9 (no hex).
 		/// Range:<br/>
 		/// 0 -> 00000000-0000-0000-0000-00000000000<br/>
-		/// 1 -> 00000000-0000-0000-0000-00000000001<br/>
 		/// 10 -> 00000000-0000-0000-0000-00000000010<br/>
 		/// 42 -> 00000000-0000-0000-0000-00000000042<br/>
 		/// ...<br/>
@@ -830,10 +828,8 @@ namespace GuidPhantom
 			return new Guid(i.ToString().PadLeft(32, '0'));
 		}
 
-
 		/// <summary>
 		/// 00000000-0000-0000-0000-00000000000 -> 0<br/>
-		/// 00000000-0000-0000-0000-00000000001 -> 1<br/>
 		/// 00000000-0000-0000-0000-00000000010 -> 10<br/> 
 		/// 00000000-0000-0000-0000-00000000042 -> 42<br/>
 		/// ...<br/>
@@ -869,13 +865,13 @@ namespace GuidPhantom
 
 			const byte newVer = 6;
 
-				bytes[0] = (byte)((bytes_6 & 0b0000_1111) << 4 | (bytes_7 & 0b1111_0000) >> 4);
-				bytes[1] = (byte)((bytes_7 & 0b0000_1111) << 4 | (bytes_4 & 0b1111_0000) >> 4);
-				bytes[2] = (byte)((bytes_4 & 0b0000_1111) << 4 | (bytes_5 & 0b1111_0000) >> 4);
-				bytes[3] = (byte)((bytes_5 & 0b0000_1111) << 4 | (bytes_0 & 0b1111_0000) >> 4);
+			bytes[0] = (byte)((bytes_6 & 0b0000_1111) << 4 | (bytes_7 & 0b1111_0000) >> 4);
+			bytes[1] = (byte)((bytes_7 & 0b0000_1111) << 4 | (bytes_4 & 0b1111_0000) >> 4);
+			bytes[2] = (byte)((bytes_4 & 0b0000_1111) << 4 | (bytes_5 & 0b1111_0000) >> 4);
+			bytes[3] = (byte)((bytes_5 & 0b0000_1111) << 4 | (bytes_0 & 0b1111_0000) >> 4);
 
-				bytes[4] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
-				bytes[5] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
+			bytes[4] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
+			bytes[5] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
 
 			bytes[6] = (byte)(newVer << 4 | bytes_2 & 0b0000_1111);
 			bytes[7] = bytes_3;
@@ -902,11 +898,11 @@ namespace GuidPhantom
 
 			const byte newVer = 1;
 
-				bytes[6] = (byte)(newVer << 4 | (bytes_0 & 0b1111_0000) >> 4);
-				bytes[7] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
+			bytes[6] = (byte)(newVer << 4 | (bytes_0 & 0b1111_0000) >> 4);
+			bytes[7] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
 
-				bytes[4] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
-				bytes[5] = (byte)((bytes_2 & 0b0000_1111) << 4 | (bytes_3 & 0b1111_0000) >> 4);
+			bytes[4] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
+			bytes[5] = (byte)((bytes_2 & 0b0000_1111) << 4 | (bytes_3 & 0b1111_0000) >> 4);
 
 			bytes[0] = (byte)((bytes_3 & 0b0000_1111) << 4 | (bytes_4 & 0b1111_0000) >> 4);
 			bytes[1] = (byte)((bytes_4 & 0b0000_1111) << 4 | (bytes_5 & 0b1111_0000) >> 4);

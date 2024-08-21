@@ -6,10 +6,20 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
+[assembly: InternalsVisibleTo("GuidPhantom.Tests")]
+
 namespace GuidPhantom
 {
 	public static class GuidKit
 	{
+		/// <summary>
+		/// Gets a <see cref="Guid" /> where all bits are set.
+		/// https://github.com/dotnet/runtime/blob/59c2ea578bd615a63d56e8ff4b1de0a6b824691f/src/libraries/System.Private.CoreLib/src/System/Guid.cs#L42
+		/// </summary>
+		/// <remarks>This returns the value: FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF</remarks>
+		public static Guid AllBitsSet => new Guid(uint.MaxValue, ushort.MaxValue, ushort.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
+
+
 		[DllImport("libuuid.so.1")]
 		private static extern int uuid_generate_time_safe(out byte[] bytes);
 
@@ -140,7 +150,7 @@ namespace GuidPhantom
 		public static Guid CreateVersion6(out bool safe)
 		{
 			var v1 = CreateVersion1(out safe);
-			return v1.SwapVersion1And6(verify_version: 1);
+			return v1.ConvertVersion1To6();
 		}
 
 		/// <summary>
@@ -161,8 +171,8 @@ namespace GuidPhantom
 		public static Guid CreateNEWSEQUENTIALID(out bool safe)
 		{
 			var v1 = CreateVersion1(out safe);
-			var bytes = v1.ToByteArray(bigEndian: true);
-			SwapEndian(bytes);
+			var bytes = v1.ToByteArray(bigEndian: false);
+			//SwapEndian(bytes);
 			return FromByteArray(bytes, bigEndian: true);
 		}
 
@@ -275,6 +285,7 @@ namespace GuidPhantom
 		/// Create version7 Guid. 6 first bytes is unix timestamp in milliseconds, the rest is random data.
 		/// Rand_a is not used as counter, only random data. This means that if more than 1 Guid is made on the same millisecond,
 		/// their relative order is random. This implementation matches the one in .NET 9.
+		/// https://github.com/dotnet/runtime/blob/59c2ea578bd615a63d56e8ff4b1de0a6b824691f/src/libraries/System.Private.CoreLib/src/System/Guid.cs#L304
 		/// </summary>
 		/// <returns>Version 7 Guid</returns>
 		public static Guid CreateVersion7()
@@ -303,12 +314,6 @@ namespace GuidPhantom
 			//          if (_createVersion7_dto.Value != null)
 			//                return _createVersion7_dto.Value(timestamp);
 
-			// 2^48 is roughly 8925.5 years, which from the Unix Epoch means we won't
-			// overflow until around July of 10,895. So there isn't any need to handle
-			// it given that DateTimeOffset.MaxValue is December 31, 9999. However, we
-			// can't represent timestamps prior to the Unix Epoch since UUIDv7 explicitly
-			// stores a 48-bit unsigned value, so we do need to throw if one is passed in.
-
 			long unix_ts_ms = timestamp.ToUnixTimeMilliseconds();
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(timestamp));
@@ -317,7 +322,7 @@ namespace GuidPhantom
 			return CreateVersion7(unix_ts_ms, ref dummy, false);
 		}
 
-		private static Guid CreateVersion7(long unix_ts_ms, ref short sequence, bool setSequence)
+		internal static Guid CreateVersion7(long unix_ts_ms, ref short sequence, bool setSequence)
 		{
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
@@ -325,9 +330,7 @@ namespace GuidPhantom
 			// This isn't the most optimal way, but we don't have an easy way to get
 			// secure random bytes in corelib without doing this since the secure rng
 			// is in a different layer.
-			Guid result = Guid.NewGuid();
-
-			var bytes = result.ToByteArray(bigEndian: true);
+			var bytes = Guid.NewGuid().ToByteArray(bigEndian: true);
 
 			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
 				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
@@ -467,16 +470,10 @@ namespace GuidPhantom
 			//            if (_createVersion7_dto.Value != null)
 			//                return _createVersion7_dto.Value(timestamp);
 
-			// 2^48 is roughly 8925.5 years, which from the Unix Epoch means we won't
-			// overflow until around July of 10,895. So there isn't any need to handle
-			// it given that DateTimeOffset.MaxValue is December 31, 9999. However, we
-			// can't represent timestamps prior to the Unix Epoch since UUIDv7 explicitly
-			// stores a 48-bit unsigned value, so we do need to throw if one is passed in.
-
 			long unix_ts_ms = timestamp.ToUnixTimeMilliseconds();
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(timestamp));
-
+			
 			short dummy = 0;
 			return CreateVersion8MsSql(unix_ts_ms, ref dummy, false);
 		}
@@ -490,7 +487,7 @@ namespace GuidPhantom
 		/// </summary>
 		/// <param name="unix_ts_ms"></param>
 		/// <returns>Version8MsSql Guid</returns>
-		private static Guid CreateVersion8MsSql(long unix_ts_ms, ref short sequence, bool setSequence)
+		internal static Guid CreateVersion8MsSql(long unix_ts_ms, ref short sequence, bool setSequence)
 		{
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
@@ -498,12 +495,18 @@ namespace GuidPhantom
 			// This isn't the most optimal way, but we don't have an easy way to get
 			// secure random bytes in corelib without doing this since the secure rng
 			// is in a different layer.
-			Guid result = Guid.NewGuid();
-
-			var bytes = result.ToByteArray(bigEndian: true);
+			var bytes = Guid.NewGuid().ToByteArray(bigEndian: true);
 
 			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
 				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
+
+			// to make it testable we move the rand
+//			SwapBytes(bytes, 0, 10);
+//			SwapBytes(bytes, 1, 11);
+//			SwapBytes(bytes, 2, 12);
+//			SwapBytes(bytes, 3, 13);
+//			SwapBytes(bytes, 4, 14);
+//			SwapBytes(bytes, 5, 15);
 
 			// time
 			bytes[10] = (byte)(unix_ts_ms >> (5 * 8));
@@ -524,7 +527,7 @@ namespace GuidPhantom
 					throw new ArgumentException("Sequence must be between 0 and 4095");
 
 				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> 6) & 0b0011_1111);
-				bytes[9] = (byte)((sequence << 2) & 0b1111_1100);
+				bytes[9] = (byte)((sequence << 2) & 0b1111_1100 | bytes[9] & 0b0000_0011);
 			}
 			else
 			{
@@ -660,69 +663,76 @@ namespace GuidPhantom
 			return FromByteArray(bytes, bigEndian: true);
 		}
 
-		/// <summary>
-		/// Swap the millis time part between the 6 first bytes and 6 last bytes.
-		/// </summary>
-		/// <param name="g"></param>
-		/// <param name="verify_version"></param>
-		/// <returns></returns>
-		private static Guid SwapVersion7And8MsSql(this Guid g, byte verify_version)//, bool swap_rand_a = true)
+
+		public static Guid ConvertVersion7To8MsSql(this Guid g_v7)
 		{
-			// <param name="swap_rand_a">Swap the 12 bits (OPTIONAL sub milliseconds) in octets 6-7</param>
-
-			var bytes = g.ToByteArray(bigEndian: true);
-			SwapVersion7And8MsSql(bytes, verify_version);//, swap_rand_a);
-			return FromByteArray(bytes, bigEndian: true);
+			var b = g_v7.ToByteArray(bigEndian: true);
+			ConvertVersion7To8MsSql(b);
+			return FromByteArray(b, bigEndian: true);
 		}
-
-		/// <summary>
-		/// Convert from v7 to v8MsSql
-		/// </summary>
-		/// <param name="g_v7"></param>
-		/// <returns>A version 8MsSql Guid</returns>
-		public static Guid ConvertVersion7To8MsSql(this Guid g_v7) => SwapVersion7And8MsSql(g_v7, verify_version: 7);
 
 		/// <summary>
 		/// Convert from v8MsSql to v7
 		/// </summary>
 		/// <param name="g_v8mssql"></param>
 		/// <returns>A version 7 Guid</returns>
-		public static Guid ConvertVersion8MsSqlTo7(this Guid g_v8mssql) => SwapVersion7And8MsSql(g_v8mssql, verify_version: 8);
+		public static Guid ConvertVersion8MsSqlTo7(this Guid g_v8mssql)
+		{
+			var b = g_v8mssql.ToByteArray(bigEndian: true);
+			ConvertVersion8MsSqlTo7(b);
+			return FromByteArray(b, bigEndian: true);
+		}
 
 		/// <summary>
 		/// Convert from v1 to v6
 		/// </summary>
 		/// <param name="g_v1"></param>
 		/// <returns>A version 6 Guid</returns>
-		public static Guid ConvertVersion1To6(this Guid g_v1) => SwapVersion1And6(g_v1, verify_version: 1);
+		public static Guid ConvertVersion1To6(this Guid g_v1)
+		{
+			var b = g_v1.ToByteArray(bigEndian: true);
+			ConvertVersion1To6(b);
+			return FromByteArray(b, bigEndian: true);
+		}
 
 		/// <summary>
 		/// Convert from v6 to v1
 		/// </summary>
 		/// <param name="g_v6"></param>
 		/// <returns>A version 1 Guid</returns>
-		public static Guid ConvertVersion6To1(this Guid g_v6) => SwapVersion1And6(g_v6, verify_version: 6);
-
-		private static void SwapVersion7And8MsSql(byte[] bytes, byte verify_version)//, bool swap_rand_a = true)
+		public static Guid ConvertVersion6To1(this Guid g_v6)
 		{
-			//byte[8]:
-			//0xx Apollo
+			var b = g_v6.ToByteArray(bigEndian: true);
+			ConvertVersion6To1(b);
+			return FromByteArray(b, bigEndian: true);
+		}
+
+
+		/*
+		  https://github.com/microsoft/referencesource/blob/master/System.Data/System/Data/SQLTypes/SQLGuid.cs
+		     public struct SqlGuid : INullable, IComparable, IXmlSerializable {
+		// Comparison orders.
+		private static readonly int[] x_rgiGuidOrder = new int[16]
+		{10, 11, 12, 13, 14, 15, 8, 9, 6, 7, 4, 5, 0, 1, 2, 3};
+        // But this is with LE. With BE it becomes (because 0-3 is int and 4-5 and 6-7 is short):
+        {10, 11, 12, 13, 14, 15, 8, 9, 7!, 6!, 5!, 4!, 3!, 2!, 1!, 0!};
+	So 0-5 can be swapped with 10-15.
+     But the middle is worse:   
+    v7->v8    
+    6 -> 8   variant | 6.5-8 -> 8.3-6 | 7.1-2 -> 8.7-8
+    7 -> 9   7.3-8 -> 9.1-6 | 8.3-4 -> 9.7-8
+    8 -> 7   8.5-8 -> 7.1-4 | 9.1-4 -> 7.5-8
+    9 -> 6   version | 9.5-8 -> 6.5-8 
+*/
+		private static void ConvertVersion7To8MsSql(byte[] bytes)
+		{
 			//10x IETF
-			//110 MS
-			//111 reserved
 			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
 				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
 
 			byte oldVer = (byte)((bytes[6] & 0b1111_0000) >> 4);
-			if (oldVer != verify_version)
-				throw new InvalidOperationException($"Version mismatch: expected {verify_version}, was {oldVer}");
-			byte newVer;
-			if (oldVer == 7)
-				newVer = 8;
-			else if (oldVer == 8)
-				newVer = 7;
-			else
-				throw new InvalidOperationException("Not version 7 or 8");
+			if (oldVer != 7)
+				throw new InvalidOperationException("Not version 7");
 
 			// time
 			SwapBytes(bytes, 0, 10);
@@ -732,31 +742,47 @@ namespace GuidPhantom
 			SwapBytes(bytes, 4, 14);
 			SwapBytes(bytes, 5, 15);
 
-			//if (true)//swap_rand_a)
-			{
-				var bytes_6 = bytes[6];
-				var bytes_7 = bytes[7];
-				var bytes_8 = bytes[8];
-				var bytes_9 = bytes[9];
+			var bytes_6 = bytes[6];
+			var bytes_7 = bytes[7];
+			var bytes_8 = bytes[8];
+			var bytes_9 = bytes[9];
 
-				// The sub-second part:
-				// swap 12 bits from byte 7 - 8 <-> byte 9 - 10.these 12 bits are at different locations.
-				// bit1 - 4: version 7 / 8 | bit5 - 8: byte9.bit3 - 6(4bits)
-				bytes[6] = (byte)(newVer << 4 | (bytes_8 >> 2) & 0b0000_1111);
-				// bit1 - 2: byte9.bit7 - 8 | bit3 - 8: byte10.bit1 - 6
-				bytes[7] = (byte)((bytes_8 << 6) & 0b1100_0000 | (bytes_9 >> 2) & 0b0011_1111);
-				// bit1 - 2: preserve variant(byte9.bit1-2) | bit3 - 6: byte7.bit5 - 8 | bit7 - 8: byte8.bit1 - 2
-				bytes[8] = (byte)(bytes_8 & 0b1100_0000 | (bytes_6 << 2) & 0b0011_1100 | (bytes_7 >> 6) & 0b0000_0011);
-				// bit1 - 6: byte8.bit3 - 8 | bit7 - 8: byte10.bit7 - 8(preserve)
-				bytes[9] = (byte)((bytes_7 << 2) & 0b1111_1100 | bytes_9 & 0b000_0011);
-			}
-			//else
-			//{
-			//    // set version
-			//    bytes[6] = (byte)((newVer << 4) | (bytes[6] & 0b0000_1111));
-			//}
+			const byte newVer = 8;
 
+			bytes[8] = (byte)(bytes_8 & 0b1100_0000 | (bytes_6 << 2) & 0b0011_1100 | (bytes_7 >> 6) & 0b0000_0011);
+			bytes[9] = (byte)((bytes_7 << 2) & 0b1111_1100 | (bytes_8 >> 4) & 0b000_0011);
+			bytes[7] = (byte)((bytes_8 << 4) & 0b1111_0000 | (bytes_9 >> 4) & 0b0000_1111);
+			bytes[6] = (byte)(newVer << 4 | bytes_9 & 0b0000_1111);
+		}
 
+		private static void ConvertVersion8MsSqlTo7(byte[] bytes)
+		{
+			//10x IETF
+			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
+				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
+
+			byte oldVer = (byte)((bytes[6] & 0b1111_0000) >> 4);
+			if (oldVer != 8)
+				throw new InvalidOperationException("Not version 8");
+
+			// time
+			SwapBytes(bytes, 0, 10);
+			SwapBytes(bytes, 1, 11);
+			SwapBytes(bytes, 2, 12);
+			SwapBytes(bytes, 3, 13);
+			SwapBytes(bytes, 4, 14);
+			SwapBytes(bytes, 5, 15);
+
+			var bytes_6 = bytes[6];
+			var bytes_7 = bytes[7];
+			var bytes_8 = bytes[8];
+			var bytes_9 = bytes[9];
+
+			const byte newVer = 7;
+			bytes[6] = (byte)(newVer << 4 | (bytes_8 >> 2) & 0b0000_1111);
+			bytes[7] = (byte)((bytes_8 << 6) & 0b1100_0000 | (bytes_9 >> 2) & 0b0011_1111);
+			bytes[8] = (byte)(bytes_8 & 0b1100_0000 | (bytes_9 << 4) & 0b0011_0000 | (bytes_7 >> 4) & 0b0000_1111);
+			bytes[9] = (byte)((bytes_7 << 4) & 0b1111_0000 | bytes_6 & 0b0000_1111);
 		}
 
 		/// <summary>
@@ -779,7 +805,6 @@ namespace GuidPhantom
 			return new Guid(i.ToString().PadLeft(32, '0'));
 		}
 
-
 		/// <summary>
 		/// 00000000-0000-0000-0000-00000000000 -> 0<br/>
 		/// 00000000-0000-0000-0000-00000000001 -> 1<br/>
@@ -797,22 +822,15 @@ namespace GuidPhantom
 			return int.Parse(g.ToString("N"));
 		}
 
-		private static Guid SwapVersion1And6(this Guid g, byte verify_version)
+		private static void ConvertVersion1To6(byte[] bytes)
 		{
-			var bytes = g.ToByteArray(bigEndian: true);
-			SwapVersion1And6(bytes, verify_version);
-			return FromByteArray(bytes, bigEndian: true);
-		}
-
-		private static void SwapVersion1And6(byte[] bytes, byte verify_version)
-		{
-			//byte[8]:
-			//0xx Apollo
 			//10x IETF
-			//110 MS
-			//111 reserved
 			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
 				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
+
+			byte oldVer = (byte)((bytes[6] & 0b1111_0000) >> 4);
+			if (oldVer != 1)
+				throw new InvalidOperationException("Not version 1");
 
 			var bytes_0 = bytes[0];
 			var bytes_1 = bytes[1];
@@ -823,42 +841,51 @@ namespace GuidPhantom
 			var bytes_6 = bytes[6];
 			var bytes_7 = bytes[7];
 
+			const byte newVer = 6;
+
+			bytes[0] = (byte)((bytes_6 & 0b0000_1111) << 4 | (bytes_7 & 0b1111_0000) >> 4);
+			bytes[1] = (byte)((bytes_7 & 0b0000_1111) << 4 | (bytes_4 & 0b1111_0000) >> 4);
+			bytes[2] = (byte)((bytes_4 & 0b0000_1111) << 4 | (bytes_5 & 0b1111_0000) >> 4);
+			bytes[3] = (byte)((bytes_5 & 0b0000_1111) << 4 | (bytes_0 & 0b1111_0000) >> 4);
+
+			bytes[4] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
+			bytes[5] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
+
+			bytes[6] = (byte)(newVer << 4 | bytes_2 & 0b0000_1111);
+			bytes[7] = bytes_3;
+		}
+
+		private static void ConvertVersion6To1(byte[] bytes)
+		{
+			//10x IETF
+			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
+				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
+
 			byte oldVer = (byte)((bytes[6] & 0b1111_0000) >> 4);
-			if (oldVer != verify_version)
-				throw new InvalidOperationException($"Version mismatch: expected {verify_version}, was {oldVer}");
-			byte newVer;
-			if (oldVer == 1)
-			{
-				newVer = 6;
+			if (oldVer != 6)
+				throw new InvalidOperationException("Not version 6");
 
-				bytes[0] = (byte)((bytes_6 & 0b0000_1111) << 4 | (bytes_7 & 0b1111_0000) >> 4);
-				bytes[1] = (byte)((bytes_7 & 0b0000_1111) << 4 | (bytes_4 & 0b1111_0000) >> 4);
-				bytes[2] = (byte)((bytes_4 & 0b0000_1111) << 4 | (bytes_5 & 0b1111_0000) >> 4);
-				bytes[3] = (byte)((bytes_5 & 0b0000_1111) << 4 | (bytes_0 & 0b1111_0000) >> 4);
+			var bytes_0 = bytes[0];
+			var bytes_1 = bytes[1];
+			var bytes_2 = bytes[2];
+			var bytes_3 = bytes[3];
+			var bytes_4 = bytes[4];
+			var bytes_5 = bytes[5];
+			var bytes_6 = bytes[6];
+			var bytes_7 = bytes[7];
 
-				bytes[4] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
-				bytes[5] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
+			const byte newVer = 1;
 
-				bytes[6] = (byte)(newVer << 4 | bytes_2 & 0b0000_1111);
-				bytes[7] = bytes_3;
-			}
-			else if (oldVer == 6)
-			{
-				newVer = 1;
+			bytes[6] = (byte)(newVer << 4 | (bytes_0 & 0b1111_0000) >> 4);
+			bytes[7] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
 
-				bytes[6] = (byte)(newVer << 4 | (bytes_0 & 0b1111_0000) >> 4);
-				bytes[7] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
+			bytes[4] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
+			bytes[5] = (byte)((bytes_2 & 0b0000_1111) << 4 | (bytes_3 & 0b1111_0000) >> 4);
 
-				bytes[4] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
-				bytes[5] = (byte)((bytes_2 & 0b0000_1111) << 4 | (bytes_3 & 0b1111_0000) >> 4);
-
-				bytes[0] = (byte)((bytes_3 & 0b0000_1111) << 4 | (bytes_4 & 0b1111_0000) >> 4);
-				bytes[1] = (byte)((bytes_4 & 0b0000_1111) << 4 | (bytes_5 & 0b1111_0000) >> 4);
-				bytes[2] = (byte)((bytes_5 & 0b0000_1111) << 4 | bytes_6 & 0b0000_1111);
-				bytes[3] = bytes_7;
-			}
-			else
-				throw new InvalidOperationException("Not version 1 or 6");
+			bytes[0] = (byte)((bytes_3 & 0b0000_1111) << 4 | (bytes_4 & 0b1111_0000) >> 4);
+			bytes[1] = (byte)((bytes_4 & 0b0000_1111) << 4 | (bytes_5 & 0b1111_0000) >> 4);
+			bytes[2] = (byte)((bytes_5 & 0b0000_1111) << 4 | bytes_6 & 0b0000_1111);
+			bytes[3] = bytes_7;
 		}
 
 		/// <summary>
@@ -878,7 +905,7 @@ namespace GuidPhantom
 				{
 					if (vv.Version == 1)
 					{
-						SwapVersion1And6(b, verify_version: 1);
+						ConvertVersion1To6(b);
 					}
 
 					// v6
@@ -905,7 +932,7 @@ namespace GuidPhantom
 				{
 					if ((vv.Version == 8 && version8type == GuidVersion8Type.MsSql))
 					{
-						SwapVersion7And8MsSql(b, verify_version: 8);
+						ConvertVersion8MsSqlTo7(b);
 					}
 
 					// v7

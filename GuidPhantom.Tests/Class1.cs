@@ -51,7 +51,8 @@ namespace GuidPhantom.Tests
 			//int i = 0;
 			foreach (var h in GuidKit.CreateVersion8MsSqlSequence().Take(1000).ToList())
 			{
-				//if (prev != null && h.ConvertVersion8MsSqlTo7().CompareTo(prev.Value.ConvertVersion8MsSqlTo7()) <= 0)
+				// https://github.com/microsoft/referencesource/blob/master/System.Data/System/Data/SQLTypes/SQLGuid.cs
+				// if (prev != null && h.ConvertVersion8MsSqlTo7().CompareTo(prev.Value.ConvertVersion8MsSqlTo7()) <= 0)
 				if (prev != null && new SqlGuid(h).CompareTo(new SqlGuid(prev.Value)) <= 0)
 				{
 					throw new Exception(h + " is less or equal to " + prev.Value);
@@ -289,6 +290,31 @@ namespace GuidPhantom.Tests
 			Assert.AreEqual(42, base_g.CreateIncrementedGuid(42).ReverseIncrementedGuid(base_g));
 			Assert.AreEqual(-420000, base_g.CreateIncrementedGuid(-420000).ReverseIncrementedGuid(base_g));
 			Assert.AreEqual(int.MaxValue, base_g.CreateIncrementedGuid(int.MaxValue).ReverseIncrementedGuid(base_g));
+		}
+
+		[TestMethod]
+		public void InternalSequence()
+		{
+#if NET6_0_OR_GREATER
+			long ts = Random.Shared.NextInt64();
+			short seq = (short)Random.Shared.Next(4095);
+#else
+			var r = new Random();
+			long ts = r.Next();
+			short seq = (short)r.Next(4095);
+#endif
+
+			var v8 = GuidKit.CreateVersion8MsSql(ts, ref seq, true);
+			var v7 = GuidKit.CreateVersion7(ts, ref seq, true);
+
+			var i8 = (GuidInfoVersion7And8MsSql)v8.GetGuidInfo(GuidVersion8Type.MsSql);
+			var i7 = (GuidInfoVersion7And8MsSql)v7.GetGuidInfo();
+
+			//Assert.AreEqual(v8, v7.ConvertVersion7To8MsSql());
+			//Assert.AreEqual(v7, v8.ConvertVersion8MsSqlTo7());
+
+			Assert.AreEqual(i7.Timestamp, i8.Timestamp);
+			Assert.AreEqual(i7.RandA, i8.RandA);
 		}
 	}
 }

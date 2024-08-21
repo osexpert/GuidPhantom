@@ -168,14 +168,14 @@ namespace GuidPhantom
         /// </summary>
         public short RandA { get; }
 
-        private DateTimeOffset GetTime()//bool add_rand_a_as_sub_milliseconds = false)
+        private DateTimeOffset GetTime(bool add_rand_a_as_sub_milliseconds = false)
         {
             var t = DateTimeOffset.FromUnixTimeMilliseconds(Timestamp);
-            //if (false)//add_rand_a_as_sub_milliseconds)
-            //{
-            //    // in old .net, AddMillis does not add fractional millis...
-            //    t = t.AddTicks(Convert.ToInt64(RandA / 4096.0 * 10000));
-            //}
+            if (add_rand_a_as_sub_milliseconds)
+            {
+                // in old .net, AddMillis does not add fractional millis...
+                t = t.AddTicks(Convert.ToInt64(RandA / 4096.0 * 10000));
+            }
             return t;
         }
     }

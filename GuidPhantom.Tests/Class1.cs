@@ -104,6 +104,11 @@ namespace GuidPhantom.Tests
 			Assert.AreEqual(inf1.Timestamp, inf6.Timestamp);
 			Assert.AreEqual(inf1.Sequence, inf6.Sequence);
 			Assert.AreEqual(inf1.Node, inf6.Node);
+
+			// from RFC
+			Assert.AreEqual(new Guid("1EC9414C-232A-6B00-B3C8-9E6BDECED846"), new Guid("C232AB00-9414-11EC-B3C8-9E6BDECED846").ConvertVersion1To6());
+			var v1inf = (GuidInfoVersion1And6)new Guid("C232AB00-9414-11EC-B3C8-9E6BDECED846").GetGuidInfo();
+			Assert.AreEqual(0x9E6BDECED846, v1inf.Node);
 		}
 
 		[TestMethod]
@@ -226,6 +231,14 @@ namespace GuidPhantom.Tests
 		{
 			var v7 = GuidKit.CreateVersion7();
 			Testv7(v7);
+
+			// from RFC
+			var gi = (GuidInfoVersion7And8)new Guid("017F22E2-79B0-7CC3-98C4-DC0C0C07398F").GetGuidInfo();
+			Assert.AreEqual(0x17F22E279B0, gi.Timestamp);
+			Assert.AreEqual(0xCC3, gi.RandA);
+			Assert.AreEqual(GuidVariant.IETF, gi.Variant);
+			Assert.AreEqual(7, gi.Version);
+			Assert.AreEqual(0x18C4DC0C0C07398F, gi.RandB);
 		}
 
 
@@ -236,10 +249,33 @@ namespace GuidPhantom.Tests
 			Testv8MsSql(v8);
 		}
 
+
+		[TestMethod]
+		public void Testv8Unknown()
+		{
+			// from RFC
+			var g = new Guid("320C3D4D-CC00-875B-8EC9-32D5F69181C0");
+			var i = (GuidInfoVersion7And8) g.GetGuidInfo();
+			Assert.AreEqual(GuidVariant.IETF, i.Variant);
+			Assert.AreEqual(8, i.Version);
+			Assert.AreEqual(0x320C3D4DCC00, i.Timestamp);
+			Assert.AreEqual(0x75B, i.RandA);
+			Assert.AreEqual(0xEC932D5F69181C0, i.RandB);
+		}
+
+		[TestMethod]
+		public void Testv7to8MsSqlSnapshot()
+		{
+			var v8mssql = new Guid("017F22E2-79B0-7CC3-98C4-DC0C0C07398F").ConvertVersion7To8MsSql();
+			// defacto per now
+			Assert.AreEqual(new Guid("dc0c0c07-398f-848c-b30d-017f22e279b0"), v8mssql);
+			Assert.AreEqual(new Guid("017F22E2-79B0-7CC3-98C4-DC0C0C07398F"), new Guid("dc0c0c07-398f-848c-b30d-017f22e279b0").ConvertVersion8MsSqlTo7());
+		}
+
 		public void Testv7(Guid v7)
 		{ 
 			Assert.AreEqual((GuidVariant.IETF, (byte)7), v7.GetVariantAndVersion());
-			var inf7 = (GuidInfoVersion7And8MsSql)v7.GetGuidInfo();
+			var inf7 = (GuidInfoVersion7And8)v7.GetGuidInfo();
 			Assert.AreEqual(7, inf7.Version);
 			Assert.AreEqual(GuidVariant.IETF, inf7.Variant);
 			var diff = DateTimeOffset.UtcNow - inf7.Time;
@@ -249,7 +285,7 @@ namespace GuidPhantom.Tests
 
 			var v8 = v7.ConvertVersion7To8MsSql();
 			Assert.AreEqual((GuidVariant.IETF, (byte)8), v8.GetVariantAndVersion());
-			var inf8 = (GuidInfoVersion7And8MsSql)v8.GetGuidInfo(version8type: GuidVersion8Type.MsSql);
+			var inf8 = (GuidInfoVersion7And8)v8.GetGuidInfo(version8type: GuidVersion8Type.MsSql);
 			Assert.AreEqual(8, inf8.Version);
 			Assert.AreEqual(GuidVariant.IETF, inf8.Variant);
 			Assert.AreEqual(inf7.Timestamp, inf8.Timestamp);
@@ -258,7 +294,7 @@ namespace GuidPhantom.Tests
 		public void Testv8MsSql(Guid v8)
 		{
 			Assert.AreEqual((GuidVariant.IETF, (byte)8), v8.GetVariantAndVersion());
-			var inf8 = (GuidInfoVersion7And8MsSql)v8.GetGuidInfo(version8type: GuidVersion8Type.MsSql);
+			var inf8 = (GuidInfoVersion7And8)v8.GetGuidInfo(version8type: GuidVersion8Type.MsSql);
 			Assert.AreEqual(8, inf8.Version);
 			Assert.AreEqual(GuidVariant.IETF, inf8.Variant);
 			var diff = DateTimeOffset.UtcNow - inf8.Time;
@@ -268,7 +304,7 @@ namespace GuidPhantom.Tests
 
 			var v7 = v8.ConvertVersion8MsSqlTo7();
 			Assert.AreEqual((GuidVariant.IETF, (byte)7), v7.GetVariantAndVersion());
-			var inf7 = (GuidInfoVersion7And8MsSql)v7.GetGuidInfo();
+			var inf7 = (GuidInfoVersion7And8)v7.GetGuidInfo();
 			Assert.AreEqual(7, inf7.Version);
 			Assert.AreEqual(GuidVariant.IETF, inf7.Variant);
 			Assert.AreEqual(inf8.Timestamp, inf7.Timestamp);
@@ -311,8 +347,8 @@ namespace GuidPhantom.Tests
 			var v8 = GuidKit.CreateVersion8MsSql(ts, ref seq, true);
 			var v7 = GuidKit.CreateVersion7(ts, ref seq, true);
 
-			var i8 = (GuidInfoVersion7And8MsSql)v8.GetGuidInfo(GuidVersion8Type.MsSql);
-			var i7 = (GuidInfoVersion7And8MsSql)v7.GetGuidInfo();
+			var i8 = (GuidInfoVersion7And8)v8.GetGuidInfo(GuidVersion8Type.MsSql);
+			var i7 = (GuidInfoVersion7And8)v7.GetGuidInfo();
 
 			//Assert.AreEqual(v8, v7.ConvertVersion7To8MsSql());
 			//Assert.AreEqual(v7, v8.ConvertVersion8MsSqlTo7());

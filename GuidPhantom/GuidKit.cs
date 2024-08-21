@@ -954,9 +954,9 @@ namespace GuidPhantom
 
 					return new GuidInfoVersion1And6(vv.Variant, vv.Version.Value, time, seq, mac);
 				}
-				else if (vv.Version == 7 || (vv.Version == 8 && version8type == GuidVersion8Type.MsSql))
+				else if (vv.Version == 7 || vv.Version == 8)
 				{
-					if ((vv.Version == 8 && version8type == GuidVersion8Type.MsSql))
+					if (vv.Version == 8 && version8type == GuidVersion8Type.MsSql)
 					{
 						ConvertVersion8MsSqlTo7(b);
 					}
@@ -974,7 +974,16 @@ namespace GuidPhantom
 						b[7]
 						);
 
-					return new GuidInfoVersion7And8MsSql(vv.Variant, vv.Version.Value, time, seq);
+					long rand_b = (long)(b[8] & 0b0011_1111) << (7 * 8) |
+						(long)b[9] << (6 * 8) |
+						(long)b[10] << (5 * 8) |
+						(long)b[11] << (4 * 8) |
+						(long)b[12] << (3 * 8) |
+						(long)b[13] << (2 * 8) |
+						(long)b[14] << (1 * 8) |
+						(long)b[15];
+
+					return new GuidInfoVersion7And8(vv.Variant, vv.Version.Value, time, seq, rand_b);
 				}
 				else if (vv.Version is not null)
 					return new GuidInfoVersion(vv.Variant, vv.Version.Value);

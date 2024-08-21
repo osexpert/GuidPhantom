@@ -129,12 +129,19 @@ namespace GuidPhantom
 
         byte[] _node;
 
-        public string Node => $"{_node[0]:X2}:{_node[1]:X2}:{_node[2]:X2}:{_node[3]:X2}:{_node[4]:X2}:{_node[5]:X2}";
+        public string NodeString  => $"{_node[0]:X2}:{_node[1]:X2}:{_node[2]:X2}:{_node[3]:X2}:{_node[4]:X2}:{_node[5]:X2}";
 
-        /// <summary>
-        /// 6 bytes mac address
-        /// </summary>
-        public byte[] GetNodeBytes()
+		public long Node => (long)_node[0] << (5 * 8) |
+			(long)_node[1] << (4 * 8) |
+			(long)_node[2] << (3 * 8) |
+			(long)_node[3] << (2 * 8) |
+			(long)_node[4] << (1 * 8)|
+			(long)_node[5];
+
+		/// <summary>
+		/// 6 bytes mac address
+		/// </summary>
+		public byte[] GetNodeBytes()
         {
             var res = new byte[6];
             Array.Copy(_node, res, 6);
@@ -145,12 +152,13 @@ namespace GuidPhantom
     /// <summary>
     /// Version 7 (and Version 8 MsSql)
     /// </summary>
-    public class GuidInfoVersion7And8MsSql : GuidInfoVersion
+    public class GuidInfoVersion7And8 : GuidInfoVersion
     {
-        public GuidInfoVersion7And8MsSql(GuidVariant variant, byte version, long timestamp, short rand_a) : base(variant, version)
+        public GuidInfoVersion7And8(GuidVariant variant, byte version, long timestamp, short rand_a, long rand_b) : base(variant, version)
         {
             Timestamp = timestamp;
             RandA = rand_a;
+			RandB = rand_b;
         }
 
         /// <summary>
@@ -168,7 +176,9 @@ namespace GuidPhantom
         /// </summary>
         public short RandA { get; }
 
-        private DateTimeOffset GetTime(bool add_rand_a_as_sub_milliseconds = false)
+		public long RandB { get; }
+
+		private DateTimeOffset GetTime(bool add_rand_a_as_sub_milliseconds = false)
         {
             var t = DateTimeOffset.FromUnixTimeMilliseconds(Timestamp);
             if (add_rand_a_as_sub_milliseconds)

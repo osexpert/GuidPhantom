@@ -318,58 +318,16 @@ namespace GuidPhantom
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(timestamp));
 
-			short dummy = 0;
+			int dummy = 0;
 			return CreateVersion7(unix_ts_ms, ref dummy, false);
 		}
 
-		internal static Guid CreateVersion7(long unix_ts_ms, ref short sequence, bool setSequence)
-		{
-			if (unix_ts_ms < 0)
-				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
-
-			// This isn't the most optimal way, but we don't have an easy way to get
-			// secure random bytes in corelib without doing this since the secure rng
-			// is in a different layer.
-			var bytes = Guid.NewGuid().ToByteArray(bigEndian: true);
-
-			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
-				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
-
-			// time
-			bytes[0] = (byte)(unix_ts_ms >> (5 * 8));
-			bytes[1] = (byte)(unix_ts_ms >> (4 * 8));
-			bytes[2] = (byte)(unix_ts_ms >> (3 * 8));
-			bytes[3] = (byte)(unix_ts_ms >> (2 * 8));
-			bytes[4] = (byte)(unix_ts_ms >> (1 * 8));
-			bytes[5] = (byte)unix_ts_ms;
-
-			// set ver 7
-			const byte newVer = 7;
-			bytes[6] = (byte)((newVer << 4) | (bytes[6] & 0b0000_1111));
-
-			// sequence
-			if (setSequence)
-			{
-				if (sequence < 0 || sequence > 4095)
-					throw new ArgumentException("Sequence must be between 0 and 4095");
-
-				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (sequence >> 8) & 0b0000_1111);
-				bytes[7] = (byte)sequence;
-			}
-			else
-			{
-				short currSeq = (short)((bytes[6] & 0b0000_1111) << 8 | bytes[7]);
-				sequence = currSeq;
-			}
-
-			return FromByteArray(bytes, bigEndian: true);
-		}
 		//#endif
 
 		/// <summary>
 		/// Create monotonic (always increasing) sequence of v7 Guid's.
-		/// When more than one Guid is created per millisecond, 12bit rand_a (initially seeded by random data) is used as counter (+1).
-		/// When counter rollover (rand_a > 4095), the timestamp is incremented (+1).
+		/// When more than one Guid is created per millisecond, 26bit from 4 middle bytes (initially seeded by random data) is used as counter (+random byte 1-255).
+		/// When counter rollover (> 67_108_864), the timestamp is incremented (+1).
 		/// </summary>
 		/// <param name="timeProvider"></param>
 		/// <returns>Version7 sequence</returns>
@@ -377,8 +335,8 @@ namespace GuidPhantom
 
 		/// <summary>
 		/// Create monotonic (always increasing) sequence of v7 Guid's.
-		/// When more than one Guid is created per millisecond, 12bit rand_a (initially seeded by random data) is used as counter (+1).
-		/// When counter rollover (rand_a > 4095), the timestamp is incremented (+1).
+		/// When more than one Guid is created per millisecond, 26bit from 4 middle bytes (initially seeded by random data) is used as counter (+random byte 1-255).
+		/// When counter rollover (> 67_108_864), the timestamp is incremented (+1).
 		/// </summary>
 		/// <returns>Version7 sequence</returns>>
 		public static IEnumerable<Guid> CreateVersion7Sequence() => CreateVersion7Or8MsSqlSequence(TimeProvider.System, 7);
@@ -399,7 +357,7 @@ namespace GuidPhantom
 		private static IEnumerable<Guid> CreateVersion7Or8MsSqlSequence(TimeProvider timeProvider, byte version)
 		{
 			long? prev_ts = null;
-			short sequence = 0;
+			int sequence = 0;
 
 			while (true)
 			{
@@ -409,9 +367,9 @@ namespace GuidPhantom
 				if (now_ts <= prev_ts)
 				{
 					now_ts = prev_ts.Value;
-					sequence++;
+					sequence += GetRandomByteNotZero();
 
-					if (sequence > 4095)
+					if (sequence > 67_108_864)
 					{
 						now_ts++;
 					}
@@ -429,6 +387,25 @@ namespace GuidPhantom
 					throw new InvalidOperationException("Not ver 7 or 8");
 
 				prev_ts = now_ts;
+			}
+		}
+
+#if NET6_0_OR_GREATER
+#else
+		static Random _rand = new Random();
+#endif
+
+		private static byte GetRandomByteNotZero()
+		{
+			while (true)
+			{
+#if NET6_0_OR_GREATER
+				var b = (byte)Random.Shared.Next(byte.MaxValue + 1);
+#else
+				var b = (byte)_rand.Next(byte.MaxValue + 1);
+#endif
+				if (b > 0)
+					return b;
 			}
 		}
 
@@ -473,21 +450,12 @@ namespace GuidPhantom
 			long unix_ts_ms = timestamp.ToUnixTimeMilliseconds();
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(timestamp));
-			
-			short dummy = 0;
+
+			int dummy = 0;
 			return CreateVersion8MsSql(unix_ts_ms, ref dummy, false);
 		}
 
-		/// <summary>
-		/// Create a Guid where the 6 last bytes is the unix time in milliseconds (v7 has time in the 6 first bytes)
-		/// 
-		/// This will make them sort correctly in ms sql server, that has a weird/opposite way of sorting:
-		/// https://stackoverflow.com/questions/7810602/sql-server-guid-sort-algorithm-why
-		/// "More technically, we look at bytes {10 to 15} first, then {8-9}, then {6-7}, then {4-5}, and lastly {0 to 3}."
-		/// </summary>
-		/// <param name="unix_ts_ms"></param>
-		/// <returns>Version8MsSql Guid</returns>
-		internal static Guid CreateVersion8MsSql(long unix_ts_ms, ref short sequence, bool setSequence)
+		internal static Guid CreateVersion7(long unix_ts_ms, ref int sequence, bool setSequence)
 		{
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
@@ -500,13 +468,63 @@ namespace GuidPhantom
 			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
 				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
 
-			// to make it testable we move the rand
-//			SwapBytes(bytes, 0, 10);
-//			SwapBytes(bytes, 1, 11);
-//			SwapBytes(bytes, 2, 12);
-//			SwapBytes(bytes, 3, 13);
-//			SwapBytes(bytes, 4, 14);
-//			SwapBytes(bytes, 5, 15);
+			// time
+			bytes[0] = (byte)(unix_ts_ms >> (5 * 8));
+			bytes[1] = (byte)(unix_ts_ms >> (4 * 8));
+			bytes[2] = (byte)(unix_ts_ms >> (3 * 8));
+			bytes[3] = (byte)(unix_ts_ms >> (2 * 8));
+			bytes[4] = (byte)(unix_ts_ms >> (1 * 8));
+			bytes[5] = (byte)unix_ts_ms;
+
+			// set ver 7
+			const byte newVer = 7;
+			bytes[6] = (byte)((newVer << 4) | (bytes[6] & 0b0000_1111));
+
+			// sequence
+			if (setSequence)
+			{
+				if (sequence < 0 || sequence > 67_108_864) // 2^26  // 4095)
+					throw new ArgumentException("Sequence must be between 0 and 67_108_864");
+
+				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (sequence >> (8 + 6 + 8)) & 0b0000_1111);
+				bytes[7] = (byte)(sequence >> (8 + 6));
+				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> 8) & 0b0011_1111);
+				bytes[9] = (byte)sequence;
+			}
+			else
+			{
+				int currSeq = (int)(
+					(bytes[6] & 0b0000_1111) << (8 + 6 + 8) |
+					bytes[7] << (8 + 6) |
+					(bytes[8] & 0b0011_1111) << 8 |
+					bytes[9]);
+				sequence = currSeq;
+			}
+
+			return FromByteArray(bytes, bigEndian: true);
+		}
+
+		/// <summary>
+		/// Create a Guid where the 6 last bytes is the unix time in milliseconds (v7 has time in the 6 first bytes)
+		/// 
+		/// This will make them sort correctly in ms sql server, that has a weird/opposite way of sorting:
+		/// https://stackoverflow.com/questions/7810602/sql-server-guid-sort-algorithm-why
+		/// "More technically, we look at bytes {10 to 15} first, then {8-9}, then {6-7}, then {4-5}, and lastly {0 to 3}."
+		/// </summary>
+		/// <param name="unix_ts_ms"></param>
+		/// <returns>Version8MsSql Guid</returns>
+		internal static Guid CreateVersion8MsSql(long unix_ts_ms, ref int sequence, bool setSequence)
+		{
+			if (unix_ts_ms < 0)
+				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
+
+			// This isn't the most optimal way, but we don't have an easy way to get
+			// secure random bytes in corelib without doing this since the secure rng
+			// is in a different layer.
+			var bytes = Guid.NewGuid().ToByteArray(bigEndian: true);
+
+			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
+				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
 
 			// time
 			bytes[10] = (byte)(unix_ts_ms >> (5 * 8));
@@ -523,15 +541,22 @@ namespace GuidPhantom
 			// sequence
 			if (setSequence)
 			{
-				if (sequence < 0 || sequence > 4095)
-					throw new ArgumentException("Sequence must be between 0 and 4095");
+				if (sequence < 0 || sequence > 67_108_864)
+					throw new ArgumentException("Sequence must be between 0 and 67_108_864");
 
-				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> 6) & 0b0011_1111);
-				bytes[9] = (byte)((sequence << 2) & 0b1111_1100 | bytes[9] & 0b0000_0011);
+				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> (4 + 8 + 8)) & 0b0011_1111);
+				bytes[9] = (byte)(sequence >> (4 + 8));
+				bytes[7] = (byte)(sequence >> 4);
+				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | sequence & 0b0000_1111);
 			}
 			else
 			{
-				short currSeq = (short)((bytes[8] & 0b0011_1111) << 6 | (bytes[9] & 0b1111_1100) >> 2);
+				int currSeq = (int)(
+					(bytes[8] & 0b0011_1111) << (4 + 8 + 8) |
+					bytes[9] << (4 + 8) |
+					bytes[7] << 4 |
+					(bytes[6] & 0b0000_1111)
+					);
 				sequence = currSeq;
 			}
 
@@ -805,6 +830,7 @@ namespace GuidPhantom
 			return new Guid(i.ToString().PadLeft(32, '0'));
 		}
 
+
 		/// <summary>
 		/// 00000000-0000-0000-0000-00000000000 -> 0<br/>
 		/// 00000000-0000-0000-0000-00000000001 -> 1<br/>
@@ -843,13 +869,13 @@ namespace GuidPhantom
 
 			const byte newVer = 6;
 
-			bytes[0] = (byte)((bytes_6 & 0b0000_1111) << 4 | (bytes_7 & 0b1111_0000) >> 4);
-			bytes[1] = (byte)((bytes_7 & 0b0000_1111) << 4 | (bytes_4 & 0b1111_0000) >> 4);
-			bytes[2] = (byte)((bytes_4 & 0b0000_1111) << 4 | (bytes_5 & 0b1111_0000) >> 4);
-			bytes[3] = (byte)((bytes_5 & 0b0000_1111) << 4 | (bytes_0 & 0b1111_0000) >> 4);
+				bytes[0] = (byte)((bytes_6 & 0b0000_1111) << 4 | (bytes_7 & 0b1111_0000) >> 4);
+				bytes[1] = (byte)((bytes_7 & 0b0000_1111) << 4 | (bytes_4 & 0b1111_0000) >> 4);
+				bytes[2] = (byte)((bytes_4 & 0b0000_1111) << 4 | (bytes_5 & 0b1111_0000) >> 4);
+				bytes[3] = (byte)((bytes_5 & 0b0000_1111) << 4 | (bytes_0 & 0b1111_0000) >> 4);
 
-			bytes[4] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
-			bytes[5] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
+				bytes[4] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
+				bytes[5] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
 
 			bytes[6] = (byte)(newVer << 4 | bytes_2 & 0b0000_1111);
 			bytes[7] = bytes_3;
@@ -876,11 +902,11 @@ namespace GuidPhantom
 
 			const byte newVer = 1;
 
-			bytes[6] = (byte)(newVer << 4 | (bytes_0 & 0b1111_0000) >> 4);
-			bytes[7] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
+				bytes[6] = (byte)(newVer << 4 | (bytes_0 & 0b1111_0000) >> 4);
+				bytes[7] = (byte)((bytes_0 & 0b0000_1111) << 4 | (bytes_1 & 0b1111_0000) >> 4);
 
-			bytes[4] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
-			bytes[5] = (byte)((bytes_2 & 0b0000_1111) << 4 | (bytes_3 & 0b1111_0000) >> 4);
+				bytes[4] = (byte)((bytes_1 & 0b0000_1111) << 4 | (bytes_2 & 0b1111_0000) >> 4);
+				bytes[5] = (byte)((bytes_2 & 0b0000_1111) << 4 | (bytes_3 & 0b1111_0000) >> 4);
 
 			bytes[0] = (byte)((bytes_3 & 0b0000_1111) << 4 | (bytes_4 & 0b1111_0000) >> 4);
 			bytes[1] = (byte)((bytes_4 & 0b0000_1111) << 4 | (bytes_5 & 0b1111_0000) >> 4);

@@ -292,16 +292,20 @@ namespace GuidPhantom.Tests
 			Assert.AreEqual(int.MaxValue, base_g.CreateIncrementedGuid(int.MaxValue).ReverseIncrementedGuid(base_g));
 		}
 
+#if NET6_0_OR_GREATER
+#else
+		static Random _rand = new Random();
+#endif
+
 		[TestMethod]
 		public void InternalSequence()
 		{
 #if NET6_0_OR_GREATER
 			long ts = Random.Shared.NextInt64();
-			short seq = (short)Random.Shared.Next(4095);
+			int seq = Random.Shared.Next(67_108_864 + 1);
 #else
-			var r = new Random();
-			long ts = r.Next();
-			short seq = (short)r.Next(4095);
+			long ts = _rand.Next();
+			int seq = _rand.Next(67_108_864 + 1);
 #endif
 
 			var v8 = GuidKit.CreateVersion8MsSql(ts, ref seq, true);

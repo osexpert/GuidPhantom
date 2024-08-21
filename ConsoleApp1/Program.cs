@@ -8,6 +8,9 @@ namespace ConsoleApp1
     {
         public static void Main()
         {
+			foreach (var x in GuidKit.CreateVersion7Sequence().Take(100000).ToList())
+				Console.WriteLine(x);
+
 			for (int x = 0; x < 1000; x++)
 			{
 				Console.WriteLine(GuidKit.CreateNEWSEQUENTIALID());

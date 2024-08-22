@@ -27,3 +27,5 @@ Yet another Guid library:-) Create Uuid v1, v3, v5, v6, v7, v8MsSql, v8SHA256, v
 
 			var inc = GuidKit.CreateIncrementedGuid(new Guid("d2f2f0fe-cbf8-4dc8-9ecb-eedd066dc105"), 42);
 			int inc42 = inc.ReverseIncrementedGuid(new Guid("d2f2f0fe-cbf8-4dc8-9ecb-eedd066dc105"));
+
+Also has sql scripts for ms sql server to create Guid v3,v5,v7(no sequence),v8mssql(no sequence) and convert v7<->v8mssql.

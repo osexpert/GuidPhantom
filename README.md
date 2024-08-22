@@ -1,5 +1,5 @@
 # GuidPhantom
-Yet another Guid library:-) Create Uuid v1, v3, v5, v6, v7, v8MsSql, v8SHA256, v8SHA512, convert between v1 and v6, convert between v7 and v8MsSql, get info about a Guid (dissect), create monotonic sequence of v7 and v8MsSql Guid's, create NEWSEQUENTIALID (ms sql), create/reverse Xor Guid, create/reverse numeric Guid, create/reverse incremented Guid.
+Yet another Guid library:-) Create Uuid v1, v3, v5, v6, v7, v8MsSql, v8SHA256, v8SHA512, convert between v1 and v6, convert between v7 and v8MsSql, get info about a Guid (dissect), create NEWSEQUENTIALID (ms sql), create/reverse Xor Guid, create/reverse numeric Guid, create/reverse incremented Guid.
 
 			var v1 = GuidKit.CreateVersion1();
 			var v3 = GuidKit.CreateVersion3(new Guid("d2f2f0fe-cbf8-4dc8-9ecb-eedd066dc105"), "Test42");
@@ -13,9 +13,6 @@ Yet another Guid library:-) Create Uuid v1, v3, v5, v6, v7, v8MsSql, v8SHA256, v
 			var v1_converted = v6.ConvertVersion6To1();
 			var nsi = GuidKit.CreateNEWSEQUENTIALID();
 
-			var v7_1000 = GuidKit.CreateVersion7Sequence().Take(1000);
-			var v8MsSql7_1000 = GuidKit.CreateVersion8MsSqlSequence().Take(1000);
-
 			var vv = nsi.GetVariantAndVersion();
 			var info = nsi.GetGuidInfo();
 
@@ -28,4 +25,4 @@ Yet another Guid library:-) Create Uuid v1, v3, v5, v6, v7, v8MsSql, v8SHA256, v
 			var inc = GuidKit.CreateIncrementedGuid(new Guid("d2f2f0fe-cbf8-4dc8-9ecb-eedd066dc105"), 42);
 			int inc42 = inc.ReverseIncrementedGuid(new Guid("d2f2f0fe-cbf8-4dc8-9ecb-eedd066dc105"));
 
-Also has sql scripts for ms sql server to create Guid v3,v5,v7(no sequence),v8mssql(no sequence) and convert v7<->v8mssql.
+Also has sql scripts for ms sql server to create Guid v3,v5,v7,v8mssql and convert v7<->v8mssql.

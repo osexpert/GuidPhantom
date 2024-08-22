@@ -1,3 +1,7 @@
+## 0.0.3
+* Make CreateVersion7 and CreateVersion8MsSql monotonic (in same process), so remove CreateVersion7Sequence and CreateVersion8MsSqlSequence.
+* Change ms sql scripts to be monotonic for uuid_v7 and uuid_v8mssql (in same session).
+
 ## 0.0.2
 * Bitswapping was not correct for v7<->v8MsSql. bytes[6] and bytes[7] were swapped (endianess).
 * CreateVersion8MsSql: forgot to preserve 2 random bits in bytes[9].

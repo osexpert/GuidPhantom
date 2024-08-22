@@ -379,12 +379,10 @@ namespace GuidPhantom
 			while (true)
 			{
 #if NET6_0_OR_GREATER
-				var b = (byte)Random.Shared.Next(byte.MaxValue + 1);
+				return (byte)(Random.Shared.Next(byte.MaxValue) + 1);
 #else
-				var b = (byte)_rand.Next(byte.MaxValue + 1);
+				return (byte)(_rand.Next(byte.MaxValue) + 1);
 #endif
-				if (b > 0)
-					return b;
 			}
 		}
 

@@ -36,7 +36,7 @@ namespace GuidPhantom
 
             var bytes = g.ToByteArray();
             if (BitConverter.IsLittleEndian == bigEndian)
-                GuidKit.SwapEndian(bytes);
+                SwapEndian(bytes);
 
             return bytes;
         }
@@ -171,10 +171,34 @@ namespace GuidPhantom
 		public static Guid CreateNEWSEQUENTIALID(out bool safe)
 		{
 			var v1 = CreateVersion1(out safe);
-			var bytes = v1.ToByteArray(bigEndian: false);
+			var bytes = v1.ToByteArray(bigEndian: true);
 			//SwapEndian(bytes);
-			return FromByteArray(bytes, bigEndian: true);
+			return FromByteArray(bytes, bigEndian: false);
 		}
+
+		//public static Guid ConvertNEWSEQUENTIALIDToVersion1(this Guid newseq)
+		//{
+		//	var bytes = newseq.ToByteArray(bigEndian: true);
+		//	SwapEndian(bytes);
+		//	var vv = GetVariantAndVersion(bytes);
+		//	if (vv.Variant != GuidVariant.IETF)
+		//		throw new Exception("Not variant " + GuidVariant.IETF); // apply to both src and target, because this byte is not swapped
+		//	if (vv.Version != 1)
+		//		throw new Exception("Target is not version 1");
+		//	return FromByteArray(bytes, bigEndian: true);
+		//}
+
+		//public static Guid ConvertVersion1ToNEWSEQUENTIALID(this Guid v1)
+		//{
+		//	var bytes = v1.ToByteArray(bigEndian: true);
+		//	var vv = GetVariantAndVersion(bytes);
+		//	if (vv.Variant != GuidVariant.IETF)
+		//		throw new Exception("Not variant " + GuidVariant.IETF);
+		//	if (vv.Version != 1)
+		//		throw new Exception("Not version 1");
+		//	SwapEndian(bytes);
+		//	return FromByteArray(bytes, bigEndian: true);
+		//}
 
 		/// <summary>
 		/// Version is only defined for variant 1, so for other variants, Version is returned as NULL.
@@ -282,94 +306,49 @@ namespace GuidPhantom
 		public static Guid CreateVersion4() => Guid.NewGuid();
 
 		/// <summary>
-		/// Create version7 Guid. 6 first bytes is unix timestamp in milliseconds, the rest is random data.
-		/// Rand_a is not used as counter, only random data. This means that if more than 1 Guid is made on the same millisecond,
-		/// their relative order is random. This implementation matches the one in .NET 9.
+		/// Create monotonic (always increasing) version 7 Guid. NOTE: monotony is only per process.
+		/// 6 first bytes are unix timestamp in milliseconds.
+		/// 6 last bytes are random data.
+		/// 4 middle bytes (initially 26bits of random data) are used as counter (randomly increased between 1-255), in case the time does not advance between calls.
+		/// If the counter rollover (> 67_108_864) the timestamp is increased +1 ms.
+		/// 
+		/// This implementation DOES NOT match CreateVersion7 in .NET 9.
 		/// https://github.com/dotnet/runtime/blob/59c2ea578bd615a63d56e8ff4b1de0a6b824691f/src/libraries/System.Private.CoreLib/src/System/Guid.cs#L304
 		/// </summary>
 		/// <returns>Version 7 Guid</returns>
-		public static Guid CreateVersion7()
-		{
-			//            if (_createVersion7.Value != null)
-			//              return _createVersion7.Value();
-
-			return CreateVersion7(DateTimeOffset.UtcNow);
-		}
-
-
-		//#if NET9_0_OR_GREATER
-
-		//        public Guid CreateVersion7(DateTimeOffset timestamp) => Guid.CreateVersion7(timestamp);
-		//#else
+		public static Guid CreateVersion7() => CreateVersion7Or8MsSql(DateTimeOffset.UtcNow, 7);
 
 		/// <summary>
-		/// Create version7 Guid. 6 first bytes is unix timestamp in milliseconds, the rest is random data.
-		/// Rand_a is not used as counter, only random data. This means that if more than 1 Guid is made on the same millisecond,
-		/// their relative order is random. This implementation matches the one in .NET 9.
+		/// Create monotonic (always increasing) version 7 Guid. NOTE: monotony is only per process.
+		/// 6 first bytes is unix timestamp in milliseconds.
+		/// 6 last bytes are random data.
+		/// 4 middle bytes (initially 26bits of random data) are used as counter (randomly increased between 1-255), in case the time does not advance between calls.
+		/// If the counter rollover (> 67_108_864) the timestamp is increased +1 ms.
+		/// 
+		/// This implementation DOES NOT match CreateVersion7 in .NET 9.
+		/// https://github.com/dotnet/runtime/blob/59c2ea578bd615a63d56e8ff4b1de0a6b824691f/src/libraries/System.Private.CoreLib/src/System/Guid.cs#L304
 		/// </summary>
 		/// <param name="timestamp"></param>
 		/// <returns>Version 7 Guid</returns>
-		public static Guid CreateVersion7(DateTimeOffset timestamp)
+		public static Guid CreateVersion7(DateTimeOffset timestamp) => CreateVersion7Or8MsSql(timestamp, 7);
+
+		static long? _prev_ts = null;
+		static int _sequence = 0;
+		static object _lock = new();
+
+		private static Guid CreateVersion7Or8MsSql(DateTimeOffset timestamp, byte version)
 		{
-			//          if (_createVersion7_dto.Value != null)
-			//                return _createVersion7_dto.Value(timestamp);
-
-			long unix_ts_ms = timestamp.ToUnixTimeMilliseconds();
-			if (unix_ts_ms < 0)
-				throw new ArgumentOutOfRangeException(nameof(timestamp));
-
-			int dummy = 0;
-			return CreateVersion7(unix_ts_ms, ref dummy, false);
-		}
-
-		//#endif
-
-		/// <summary>
-		/// Create monotonic (always increasing) sequence of v7 Guid's.
-		/// When more than one Guid is created per millisecond, 26bit from 4 middle bytes (initially seeded by random data) is used as counter (+random byte 1-255).
-		/// When counter rollover (> 67_108_864), the timestamp is incremented (+1).
-		/// </summary>
-		/// <param name="timeProvider"></param>
-		/// <returns>Version7 sequence</returns>
-		public static IEnumerable<Guid> CreateVersion7Sequence(TimeProvider timeProvider) => CreateVersion7Sequence(TimeProvider.System);
-
-		/// <summary>
-		/// Create monotonic (always increasing) sequence of v7 Guid's.
-		/// When more than one Guid is created per millisecond, 26bit from 4 middle bytes (initially seeded by random data) is used as counter (+random byte 1-255).
-		/// When counter rollover (> 67_108_864), the timestamp is incremented (+1).
-		/// </summary>
-		/// <returns>Version7 sequence</returns>>
-		public static IEnumerable<Guid> CreateVersion7Sequence() => CreateVersion7Or8MsSqlSequence(TimeProvider.System, 7);
-
-		/// <summary>
-		/// Same as CreateVersion7Sequence, but data is rearranged to a v8 variant that is ordered in MsSql.
-		/// </summary>
-		/// <returns>Version8MsSql sequence</returns>
-		public static IEnumerable<Guid> CreateVersion8MsSqlSequence() => CreateVersion7Or8MsSqlSequence(TimeProvider.System, 8);
-
-		/// <summary>
-		/// Same as CreateVersion7Sequence but bits rearranged to make it ordered in MsSql (and then set as Version8)
-		/// </summary>
-		/// <param name="timeProvider"></param>
-		/// <returns>Version8MsSql sequence</returns>
-		public static IEnumerable<Guid> CreateVersion8MsSqlSequence(TimeProvider timeProvider) => CreateVersion7Or8MsSqlSequence(timeProvider, 8);
-
-		private static IEnumerable<Guid> CreateVersion7Or8MsSqlSequence(TimeProvider timeProvider, byte version)
-		{
-			long? prev_ts = null;
-			int sequence = 0;
-
-			while (true)
+			lock (_lock)
 			{
-				long now_ts = timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
+				long now_ts = timestamp.ToUnixTimeMilliseconds();
 
 				bool setSequence = false;
-				if (now_ts <= prev_ts)
+				if (now_ts <= _prev_ts)
 				{
-					now_ts = prev_ts.Value;
-					sequence += GetRandomByteNotZero();
+					now_ts = _prev_ts.Value;
+					_sequence += GetRandomByteNotZero();
 
-					if (sequence > 67_108_864)
+					if (_sequence > 67_108_864)
 					{
 						now_ts++;
 					}
@@ -379,14 +358,14 @@ namespace GuidPhantom
 					}
 				}
 
-				if (version == 7)
-					yield return CreateVersion7(now_ts, ref sequence, setSequence);
-				else if (version == 8)
-					yield return CreateVersion8MsSql(now_ts, ref sequence, setSequence);
-				else
-					throw new InvalidOperationException("Not ver 7 or 8");
+				_prev_ts = now_ts;
 
-				prev_ts = now_ts;
+				if (version == 7)
+					return CreateVersion7(now_ts, ref _sequence, setSequence);
+				else if (version == 8)
+					return CreateVersion8MsSql(now_ts, ref _sequence, setSequence);
+				else
+					throw new InvalidOperationException("Not version 7 or 8");
 			}
 		}
 
@@ -432,28 +411,17 @@ namespace GuidPhantom
 		}
 
 		/// <summary>
-		/// Same as Version7 but bits rearranged to make it ordered in MsSql (and then set as Version8)
+		/// Same as CreateVersion7 but bits rearranged to make it ordered in MsSql (and then set as Version8)
 		/// </summary>
 		/// <returns>Version8MsSql Guid</returns>
-		public static Guid CreateVersion8MsSql() => CreateVersion8MsSql(DateTimeOffset.Now);
+		public static Guid CreateVersion8MsSql() => CreateVersion7Or8MsSql(DateTimeOffset.UtcNow, 8);
 
 		/// <summary>
-		/// Same as Version7 but bits rearranged to make it ordered in MsSql (and then set as Version8)
+		/// Same as CreateVersion7 but bits rearranged to make it ordered in MsSql (and then set as Version8)
 		/// </summary>
 		/// <param name="timestamp"></param>
 		/// <returns>Version8MsSql Guid</returns>
-		public static Guid CreateVersion8MsSql(DateTimeOffset timestamp)
-		{
-			//            if (_createVersion7_dto.Value != null)
-			//                return _createVersion7_dto.Value(timestamp);
-
-			long unix_ts_ms = timestamp.ToUnixTimeMilliseconds();
-			if (unix_ts_ms < 0)
-				throw new ArgumentOutOfRangeException(nameof(timestamp));
-
-			int dummy = 0;
-			return CreateVersion8MsSql(unix_ts_ms, ref dummy, false);
-		}
+		public static Guid CreateVersion8MsSql(DateTimeOffset timestamp) => CreateVersion7Or8MsSql(timestamp, 8);
 
 		internal static Guid CreateVersion7(long unix_ts_ms, ref int sequence, bool setSequence)
 		{
@@ -774,7 +742,7 @@ namespace GuidPhantom
 
 			const byte newVer = 8;
 			bytes[8] = (byte)(bytes_8 & 0b1100_0000 | (bytes_6 << 2) & 0b0011_1100 | (bytes_7 >> 6) & 0b0000_0011);
-			bytes[9] = (byte)((bytes_7 << 2) & 0b1111_1100 | (bytes_8 >> 4) & 0b000_0011);
+			bytes[9] = (byte)((bytes_7 << 2) & 0b1111_1100 | (bytes_8 >> 4) & 0b0000_0011);
 			bytes[7] = (byte)((bytes_8 << 4) & 0b1111_0000 | (bytes_9 >> 4) & 0b0000_1111);
 			bytes[6] = (byte)(newVer << 4 | bytes_9 & 0b0000_1111);
 		}

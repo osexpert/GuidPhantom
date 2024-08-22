@@ -45,12 +45,12 @@ BEGIN
 	declare @uuid binary(16) = @time + @rand
 
 	-- set version 7
-	declare @byte7 binary = (SUBSTRING(@uuid, 7, 1) & 15) | (7 * 16)
-	set @uuid = SUBSTRING(@uuid, 1, 6) + @byte7 + SUBSTRING(@uuid, 8, 9)
+	declare @bytes_6 binary = (SUBSTRING(@uuid, 7, 1) & 15) | (7 * 16)
+	set @uuid = SUBSTRING(@uuid, 1, 6) + @bytes_6 + SUBSTRING(@uuid, 8, 9)
 
 	-- set variant 1
-	declare @byte9 binary = (SUBSTRING(@uuid, 9, 1) & 63) | 128
-	set @uuid = SUBSTRING(@uuid, 1, 8) + @byte9 + SUBSTRING(@uuid, 10, 7)
+	declare @bytes_8 binary = (SUBSTRING(@uuid, 9, 1) & 63) | 128
+	set @uuid = SUBSTRING(@uuid, 1, 8) + @bytes_8 + SUBSTRING(@uuid, 10, 7)
 
 	-- swap result
 	return dbo.uuid_swap_endian(@uuid)
@@ -72,12 +72,12 @@ BEGIN
 	declare @uuid binary(16) = @rand + @time
 
 	-- set version 8
-	declare @byte7 binary = (SUBSTRING(@uuid, 7, 1) & 15) | (8 * 16)
-	set @uuid = SUBSTRING(@uuid, 1, 6) + @byte7 + SUBSTRING(@uuid, 8, 9)
+	declare @bytes_6 binary = (SUBSTRING(@uuid, 7, 1) & 15) | (8 * 16)
+	set @uuid = SUBSTRING(@uuid, 1, 6) + @bytes_6 + SUBSTRING(@uuid, 8, 9)
 
 	-- set variant 1
-	declare @byte9 binary = (SUBSTRING(@uuid, 9, 1) & 63) | 128
-	set @uuid = SUBSTRING(@uuid, 1, 8) + @byte9 + SUBSTRING(@uuid, 10, 7)
+	declare @bytes_8 binary = (SUBSTRING(@uuid, 9, 1) & 63) | 128
+	set @uuid = SUBSTRING(@uuid, 1, 8) + @bytes_8 + SUBSTRING(@uuid, 10, 7)
 
 	-- swap result
 	return dbo.uuid_swap_endian(@uuid)

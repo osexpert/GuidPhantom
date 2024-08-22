@@ -8,7 +8,7 @@ namespace ConsoleApp1
     {
         public static void Main()
         {
-			foreach (var x in GuidKit.CreateVersion7Sequence().Take(100000).ToList())
+			foreach (var x in Take(100000, () => GuidKit.CreateVersion7()))
 				Console.WriteLine(x);
 
 			for (int x = 0; x < 1000; x++)
@@ -28,8 +28,8 @@ namespace ConsoleApp1
 			var v1_converted = v6.ConvertVersion6To1();
 			var nsi = GuidKit.CreateNEWSEQUENTIALID();
 
-			var v7_1000 = GuidKit.CreateVersion7Sequence().Take(1000);
-			var v8MsSql7_1000 = GuidKit.CreateVersion8MsSqlSequence().Take(1000);
+			var v7_1000 = Take(1000, () => GuidKit.CreateVersion7());
+			var v8MsSql7_1000 = Take(1000, () => GuidKit.CreateVersion8MsSql());
 
 			var vv = nsi.GetVariantAndVersion();
 			var info = nsi.GetGuidInfo();
@@ -68,6 +68,13 @@ namespace ConsoleApp1
 				if (g.CreateIncrementedGuid(i).ReverseIncrementedGuid(g) != i)
 					throw new Exception();
 			}
+		}
+
+		private static IEnumerable<Guid> Take(int v, Func<Guid> value)
+		{
+			int i = v;
+			while (v-- > 0)
+				yield return value();
 		}
 	}
 }

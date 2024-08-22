@@ -31,11 +31,11 @@ BEGIN
 	-- start with ns + hash(name)
 	declare @uuid binary(16) = SUBSTRING(HASHBYTES(@algo, cast(@ns as binary(16)) + cast(@name as varbinary(max))), 1, 16)
 	-- set version
-	declare @byte7 binary = (SUBSTRING(@uuid, 7, 1) & 15) | (@version * 16)
-	select @uuid = SUBSTRING(@uuid, 1, 6) + @byte7 + SUBSTRING(@uuid, 8, 9)
+	declare @bytes_6 binary = (SUBSTRING(@uuid, 7, 1) & 15) | (@version * 16)
+	select @uuid = SUBSTRING(@uuid, 1, 6) + @bytes_6 + SUBSTRING(@uuid, 8, 9)
 	-- set variant 1
-	declare @byte9 binary = (SUBSTRING(@uuid, 9, 1) & 63) | 128
-	select @uuid = SUBSTRING(@uuid, 1, 8) + @byte9 + SUBSTRING(@uuid, 10, 7)
+	declare @bytes_8 binary = (SUBSTRING(@uuid, 9, 1) & 63) | 128
+	select @uuid = SUBSTRING(@uuid, 1, 8) + @bytes_8 + SUBSTRING(@uuid, 10, 7)
 	-- swap result
 	return dbo.uuid_swap_endian(@uuid)
 END

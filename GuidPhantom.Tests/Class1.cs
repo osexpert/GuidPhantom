@@ -2,6 +2,7 @@
 using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Data.SqlTypes;
+using System.Collections.Generic;
 
 namespace GuidPhantom.Tests
 {
@@ -20,8 +21,7 @@ namespace GuidPhantom.Tests
 		public void Ver7SequenceRising()
 		{
 			Guid? prev = null;
-			//int i = 0;
-			foreach (var h in GuidKit.CreateVersion7Sequence().Take(1000).ToList())
+			foreach (var h in Take(1000, () => GuidKit.CreateVersion7()).ToList())
 			{
 				if (prev != null && h.CompareTo(prev.Value) <= 0)
 				{
@@ -31,16 +31,23 @@ namespace GuidPhantom.Tests
 			}
 		}
 
+		private IEnumerable<Guid> Take(int v, Func<Guid> value)
+		{
+			int i = v;
+			while (v-- > 0)
+				yield return value();
+		}
+
 		[TestMethod]
 		public void Ver7Sequence()
 		{
-			var s = GuidKit.CreateVersion7Sequence().Take(1).Single();
+			var s = GuidKit.CreateVersion7();
 			Testv7(s);
 		}
 		[TestMethod]
 		public void Ver8MsSqlSequence()
 		{
-			var s = GuidKit.CreateVersion8MsSqlSequence().Take(1).Single();
+			var s = GuidKit.CreateVersion8MsSql();
 			Testv8MsSql(s);
 		}
 
@@ -49,7 +56,7 @@ namespace GuidPhantom.Tests
 		{
 			Guid? prev = null;
 			//int i = 0;
-			foreach (var h in GuidKit.CreateVersion8MsSqlSequence().Take(1000).ToList())
+			foreach (var h in Take(1000, () => GuidKit.CreateVersion8MsSql()).ToList())
 			{
 				// https://github.com/microsoft/referencesource/blob/master/System.Data/System/Data/SQLTypes/SQLGuid.cs
 				// if (prev != null && h.ConvertVersion8MsSqlTo7().CompareTo(prev.Value.ConvertVersion8MsSqlTo7()) <= 0)
@@ -356,6 +363,16 @@ namespace GuidPhantom.Tests
 			Assert.AreEqual(i7.Timestamp, i8.Timestamp);
 			Assert.AreEqual(i7.RandA, i8.RandA);
 		}
+
+		//[TestMethod]
+		//public void NewSeqConvert()
+		//{
+		//	var ns = GuidKit.CreateNEWSEQUENTIALID();
+		//	var i = ns.GetGuidInfo();
+		//	var v1 = ns.ConvertNEWSEQUENTIALIDToVersion1();
+		//	var nsb = v1.ConvertVersion1ToNEWSEQUENTIALID();
+		//	Assert.AreEqual(ns, nsb);
+		//}
 	}
 }
 

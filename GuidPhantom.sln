@@ -7,7 +7,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleApp1", "ConsoleApp1\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GuidPhantom", "GuidPhantom\GuidPhantom.csproj", "{B7527D62-91EF-4021-B416-BABC0B669BA2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GuidPhantom.Tests", "GuidPhantom.Tests\GuidPhantom.Tests.csproj", "{59FB39DE-01B5-419D-A9E7-284D9B67A9F2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GuidPhantom.Tests", "GuidPhantom.Tests\GuidPhantom.Tests.csproj", "{59FB39DE-01B5-419D-A9E7-284D9B67A9F2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9E0D0D83-DEAD-4999-982C-B17835E9557F}"
+	ProjectSection(SolutionItems) = preProject
+		Uuid_v3_v5.sql = Uuid_v3_v5.sql
+		Uuid_v7_v8mssql.sql = Uuid_v7_v8mssql.sql
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

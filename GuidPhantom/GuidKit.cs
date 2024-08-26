@@ -349,7 +349,7 @@ namespace GuidPhantom
 				{
 					now_ts = _prev_ts.Value;
 
-					var rand_inc = bytes[version == 7 ? 0 : 10]; // use the first byte overwritten by clock
+					var rand_inc = bytes[version == 7 ? 0 : 10]; // use the first byte overwritten by timestamp
 					_sequence += (rand_inc == 0 ? 42 : rand_inc);
 
 					if (_sequence > 67_108_864)
@@ -997,5 +997,51 @@ namespace GuidPhantom
 			// both guid's equal
 			return 0;
 		}
+
+		/// <summary>
+		/// Parse eg. 0x01918D8D60A77B77AF4A98D3DF112D66
+		/// or 01918D8D60A77B77AF4A98D3DF112D66
+		/// (with or without 0x prefix)
+		/// Case insensitive.
+		/// </summary>
+		/// <param name="hex"></param>
+		/// <returns></returns>
+		public static Guid FromHexString(string hex, bool bigEndian = true)
+		{
+			if (hex.Length == 16 * 2)
+				return FromByteArray(StringToByteArrayFastest(hex), bigEndian: bigEndian);
+
+			if (hex.Length == 17 * 2 && hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X'))
+				return FromByteArray(StringToByteArrayFastest(hex.Substring(2)), bigEndian: bigEndian);
+
+			throw new ArgumentException("Must be 32 or 34 chars (0x prefixed)");
+		}
+
+		private static byte[] StringToByteArrayFastest(string hex)
+		{
+			if (hex.Length % 2 == 1)
+				throw new ArgumentException("The binary key cannot have an odd number of digits");
+
+			byte[] arr = new byte[hex.Length >> 1];
+
+			for (int i = 0; i < hex.Length >> 1; ++i)
+			{
+				arr[i] = (byte)((GetHexVal(hex[i << 1]) << 4) + (GetHexVal(hex[(i << 1) + 1])));
+			}
+
+			return arr;
+		}
+
+		private static int GetHexVal(char hex)
+		{
+			int val = (int)hex;
+			//For uppercase A-F letters:
+			//return val - (val < 58 ? 48 : 55);
+			//For lowercase a-f letters:
+			//return val - (val < 58 ? 48 : 87);
+			//Or the two combined, but a bit slower:
+			return val - (val < 58 ? 48 : (val < 97 ? 55 : 87));
+		}
+
 	}
 }

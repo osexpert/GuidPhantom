@@ -1,6 +1,7 @@
 IF OBJECT_ID('uuid_swap_endian') IS NOT NULL drop function uuid_swap_endian
 IF OBJECT_ID('uuid_v7_data') IS NOT NULL DROP VIEW uuid_v7_data
 IF OBJECT_ID('uuid_v7') IS NOT NULL drop function uuid_v7
+IF OBJECT_ID('uuid_v7_array') IS NOT NULL drop function uuid_v7_array
 IF OBJECT_ID('uuid_v8mssql') IS NOT NULL drop function uuid_v8mssql
 IF OBJECT_ID('uuid_v8mssql_from_v7') IS NOT NULL drop function uuid_v8mssql_from_v7
 IF OBJECT_ID('uuid_v7_from_v8mssql') IS NOT NULL drop function uuid_v7_from_v8mssql
@@ -27,7 +28,7 @@ CREATE VIEW uuid_v7_data
 AS
 SELECT 
 	SYSUTCDATETIME() AS utc_now,
-    CRYPT_GEN_RANDOM(10) AS rand_10,
+	CRYPT_GEN_RANDOM(10) AS rand_10,
 	CRYPT_GEN_RANDOM(1) AS rand_1
 GO
 
@@ -59,7 +60,6 @@ BEGIN
 		else
 			set @setSequence = 1
 	end
-	set @prev_unix_ms = @now_unix_ms
 
 	declare @bytes_6 binary = SUBSTRING(@rand, 1, 1)
 	declare @bytes_7 binary = SUBSTRING(@rand, 2, 1)
@@ -92,12 +92,25 @@ BEGIN
 			@bytes_9
 	end
 
-	EXEC sp_set_session_context 'uuid.prev_unix_ms', @prev_unix_ms;  
+	EXEC sp_set_session_context 'uuid.prev_unix_ms', @now_unix_ms;  
 	EXEC sp_set_session_context 'uuid.prev_sequence', @seq;
 
 	declare @time binary(6) = cast(@now_unix_ms as binary(6))
 	declare @uuid binary(16) = @time + @bytes_6 + @bytes_7 + @bytes_8 + @bytes_9 + SUBSTRING(@rand, 5, 6)
 	-- swap result
+	return dbo.uuid_swap_endian(@uuid)
+END
+GO
+
+-- Version 7 big endian array. Double swapping sucks, but optional function arguments sucks too (need to use 'default' for optional arguments)
+CREATE FUNCTION uuid_v7_array()
+RETURNS binary(16)
+WITH EXECUTE AS CALLER
+AS
+BEGIN
+-- PS: seems to be a bug in ms sql. If these two function calls are combined in the same statement, stuff are executed out of order... Its a mystery.
+-- Splitting them and the problem is gone...
+	declare @uuid binary(16) = dbo.uuid_v7()
 	return dbo.uuid_swap_endian(@uuid)
 END
 GO
@@ -130,7 +143,6 @@ BEGIN
 		else
 			set @setSequence = 1
 	end
-	set @prev_unix_ms = @now_unix_ms
 
 	declare @bytes_6 binary = SUBSTRING(@rand, 7, 1)
 	declare @bytes_7 binary = SUBSTRING(@rand, 8, 1)
@@ -163,7 +175,7 @@ BEGIN
 			(@bytes_6 & 15)
 	end
 
-	EXEC sp_set_session_context 'uuid.prev_unix_ms', @prev_unix_ms;  
+	EXEC sp_set_session_context 'uuid.prev_unix_ms', @now_unix_ms;  
 	EXEC sp_set_session_context 'uuid.prev_sequence', @seq;
 
 	declare @time binary(6) = cast(@now_unix_ms as binary(6))
@@ -325,7 +337,7 @@ set nocount on
 while (@i < 100000)
 begin
     insert into UuidAsArrayFragTest values(
-    	dbo.uuid_swap_endian(dbo.uuid_v7()),
+    	dbo.uuid_v7_array(),
     	SYSUTCDATETIME()
 	)
     set @i = @i + 1

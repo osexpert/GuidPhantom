@@ -1,3 +1,11 @@
+## 0.0.4
+* Add rollover guard (initialize top bit of 26bit counter to 0)
+* Rename GuidInfoVersion1And6.Sequence -> GuidInfoVersion1And6.ClockSequence
+* PERF: reduce lock region
+* PERF: do not use class Random to get the 1-255 increment. Fetch it from the Guid instead (a part overwritten by timestamp).
+* Add FromHexString
+* Sql: add uuid_v7_array function. Using dbo.uuid_swap_endian(dbo.uuid_v7()) directly (two functions calls in same statement) mysteriously generate Uuid's out of order!?
+
 ## 0.0.3
 * Make CreateVersion7 and CreateVersion8MsSql monotonic (in same process), so remove CreateVersion7Sequence and CreateVersion8MsSqlSequence.
 * Change ms sql scripts to be monotonic for uuid_v7 and uuid_v8mssql (in same session).

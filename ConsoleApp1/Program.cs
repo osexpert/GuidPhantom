@@ -9,6 +9,16 @@ namespace ConsoleApp1
     {
         public static void Main()
         {
+			var gg131 = GuidKit.FromHexString("0x01918D8D60A77B77922D5F5A89EE07BF", bigEndian: true);
+			// gg131 = {01918d8d-60a7-7b77-922d-5f5a89ee07bf}
+			var gg138 = GuidKit.FromHexString("0x01918D8D60A77B778951ADD260B48EEE", bigEndian: true);
+			// gg138 = {01918d8d-60a7-7b77-8951-add260b48eee}
+			// 138 happens later, should have had a different timestamp...something funny going on here...
+			// seems like ms sql make them out of order?
+			var gg137 = GuidKit.FromHexString("0x01918D8D60A77B77AF4A98D3DF112D66", bigEndian: true);
+			// gg137 = {01918d8d-60a7-7b77-af4a-98d3df112d66}
+			
+
 			var v1 = GuidKit.CreateVersion1();
 			var v3 = GuidKit.CreateVersion3(new Guid("d2f2f0fe-cbf8-4dc8-9ecb-eedd066dc105"), "Test42");
 			var v5 = GuidKit.CreateVersion5(new Guid("d2f2f0fe-cbf8-4dc8-9ecb-eedd066dc105"), "Test42");

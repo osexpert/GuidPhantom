@@ -3,6 +3,7 @@ IF OBJECT_ID('uuid_v7_data') IS NOT NULL DROP VIEW uuid_v7_data
 IF OBJECT_ID('uuid_v7') IS NOT NULL drop function uuid_v7
 IF OBJECT_ID('uuid_v7_array') IS NOT NULL drop function uuid_v7_array
 IF OBJECT_ID('uuid_v8mssql') IS NOT NULL drop function uuid_v8mssql
+IF OBJECT_ID('uuid_v8mssql_array') IS NOT NULL drop function uuid_v8mssql_array
 IF OBJECT_ID('uuid_v8mssql_from_v7') IS NOT NULL drop function uuid_v8mssql_from_v7
 IF OBJECT_ID('uuid_v7_from_v8mssql') IS NOT NULL drop function uuid_v7_from_v8mssql
 GO
@@ -35,8 +36,9 @@ GO
 -- uuid v7: time + random
 -- Not ordered in ms sql server if stored as uniqueidentifier.
 -- Based on https://github.com/osexpert/GuidPhantom/blob/main/GuidPhantom/GuidKit.cs
-CREATE FUNCTION uuid_v7()
-RETURNS uniqueidentifier
+-- Returns big endian array
+CREATE FUNCTION uuid_v7_array()
+RETURNS binary(16)
 WITH EXECUTE AS CALLER
 AS
 BEGIN
@@ -97,20 +99,20 @@ BEGIN
 
 	declare @time binary(6) = cast(@now_unix_ms as binary(6))
 	declare @uuid binary(16) = @time + @bytes_6 + @bytes_7 + @bytes_8 + @bytes_9 + SUBSTRING(@rand, 5, 6)
-	-- swap result
-	return dbo.uuid_swap_endian(@uuid)
+
+	return @uuid
 END
 GO
 
 -- Version 7 big endian array. Double swapping sucks, but optional function arguments sucks too (need to use 'default' for optional arguments)
-CREATE FUNCTION uuid_v7_array()
-RETURNS binary(16)
+CREATE FUNCTION uuid_v7()
+RETURNS uniqueidentifier
 WITH EXECUTE AS CALLER
 AS
 BEGIN
 -- PS: seems to be a bug in ms sql. If these two function calls are combined in the same statement, stuff are executed out of order... Its a mystery.
 -- Splitting them and the problem is gone...
-	declare @uuid binary(16) = dbo.uuid_v7()
+	declare @uuid binary(16) = dbo.uuid_v7_array()
 	return dbo.uuid_swap_endian(@uuid)
 END
 GO
@@ -118,8 +120,9 @@ GO
 -- Like uuid v7, but swap rand and time to make it ordered in ms sql server when stored as uniqueidentifier.
 -- Based on https://github.com/mareek/UUIDNext/blob/main/Src/UUIDNext/Generator/UuidV8SqlServerGenerator.cs
 -- Based on https://github.com/osexpert/GuidPhantom/blob/main/GuidPhantom/GuidKit.cs
-CREATE FUNCTION uuid_v8mssql()
-RETURNS uniqueidentifier
+-- Returns big endian array
+CREATE FUNCTION uuid_v8mssql_array()
+RETURNS binary(16)
 WITH EXECUTE AS CALLER
 AS
 BEGIN
@@ -180,11 +183,22 @@ BEGIN
 
 	declare @time binary(6) = cast(@now_unix_ms as binary(6))
 	declare @uuid binary(16) = SUBSTRING(@rand, 1, 6) + @bytes_6 + @bytes_7 + @bytes_8 + @bytes_9 + @time
-	-- swap result
-	return dbo.uuid_swap_endian(@uuid)
+
+	return @uuid
 END
 GO
 
+CREATE FUNCTION uuid_v8mssql()
+RETURNS uniqueidentifier
+WITH EXECUTE AS CALLER
+AS
+BEGIN
+-- PS: seems to be a bug in ms sql. If these two function calls are combined in the same statement, stuff are executed out of order... Its a mystery.
+-- Splitting them and the problem is gone...
+	declare @uuid binary(16) = dbo.uuid_v8mssql_array()
+	return dbo.uuid_swap_endian(@uuid)
+END
+GO
 
 -- Create uuid v7 from v8 ms sql server.
 -- Based on https://github.com/osexpert/GuidPhantom/blob/main/GuidPhantom/GuidKit.cs
@@ -250,7 +264,6 @@ BEGIN
 
 	-- combine
 	set @uuid = @last6 + @bytes_6 + @bytes_7 + @bytes_8 + @bytes_9 + @first6
-
 	-- swap result
 	return dbo.uuid_swap_endian(@uuid)
 END
@@ -320,7 +333,7 @@ where object_id = object_id('UuidAsStringFragTest')
 -- dbo.uuid_v7(): 35-43%
 -- dbo.uuid_v8mssql(): 99%
 -- newid(): 98%
--- More Ulid stuff here: https://github.com/rmalayter/ulid-mssql/tree/master
+-- dbo.uuid_v7() is better than newid(), but not great. Ulid produces proper lexical order: https://github.com/rmalayter/ulid-mssql/tree/master
 
 IF OBJECT_ID('UuidAsArrayFragTest') IS NOT NULL drop table UuidAsArrayFragTest
 GO
@@ -346,8 +359,8 @@ end
 -- check frag
 select * from sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL, NULL, NULL)
 where object_id = object_id('UuidAsArrayFragTest')
--- dbo.uuid_swap_endianess(dbo.uuid_v7()): 0.4%
--- dbo.uuid_v7: 99%
+-- dbo.uuid_v7_array(): 0.4%
+-- dbo.uuid_v7(): 99%
 -- newid(): 99%
 -- dbo.uuid_v8mssql(): 99%
--- dbo.uuid_swap_endianess(dbo.uuid_v8mssql()): 99%
+-- dbo.uuid_v8mssql_array(): 99%

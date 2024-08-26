@@ -82,6 +82,9 @@ BEGIN
 	end
 	else
 	begin
+		-- rollover guard: make top bit of counter initially 0
+		set @bytes_6 = @bytes_6 & 247;
+
 		set @seq = 
 			((@bytes_6 & 15) * 4194304) |
 			(@bytes_7 * 16384) |
@@ -150,6 +153,9 @@ BEGIN
 	end
 	else
 	begin
+		-- rollover guard: make top bit of counter initially 0
+		set @bytes_8 = @bytes_8 & 223
+
 		set @seq = 
 			((@bytes_8 & 63) * 1048576) |
 			(@bytes_9 * 4096) |

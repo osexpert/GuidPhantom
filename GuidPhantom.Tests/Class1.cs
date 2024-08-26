@@ -3,6 +3,8 @@ using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Data.SqlTypes;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Threading;
 
 namespace GuidPhantom.Tests
 {
@@ -109,7 +111,7 @@ namespace GuidPhantom.Tests
 			Assert.AreEqual(6, inf6.Version);
 			Assert.AreEqual(GuidVariant.IETF, inf6.Variant);
 			Assert.AreEqual(inf1.Timestamp, inf6.Timestamp);
-			Assert.AreEqual(inf1.Sequence, inf6.Sequence);
+			Assert.AreEqual(inf1.ClockSequence, inf6.ClockSequence);
 			Assert.AreEqual(inf1.Node, inf6.Node);
 
 			// from RFC
@@ -139,7 +141,7 @@ namespace GuidPhantom.Tests
 			Assert.AreEqual(1, inf1.Version);
 			Assert.AreEqual(GuidVariant.IETF, inf1.Variant);
 			Assert.AreEqual(inf6.Timestamp, inf1.Timestamp);
-			Assert.AreEqual(inf6.Sequence, inf1.Sequence);
+			Assert.AreEqual(inf6.ClockSequence, inf1.ClockSequence);
 			Assert.AreEqual(inf6.Node, inf1.Node);
 		}
 
@@ -340,6 +342,7 @@ namespace GuidPhantom.Tests
 		static Random _rand = new Random();
 #endif
 
+
 		[TestMethod]
 		public void InternalSequence()
 		{
@@ -351,8 +354,13 @@ namespace GuidPhantom.Tests
 			int seq = _rand.Next(67_108_864 + 1);
 #endif
 
-			var v8 = GuidKit.CreateVersion8MsSql(ts, ref seq, true);
-			var v7 = GuidKit.CreateVersion7(ts, ref seq, true);
+			var bytesv8 = Guid.NewGuid().ToByteArray(bigEndian: true);
+			GuidKit.CreateVersion8MsSql(bytesv8, ts, ref seq, true);
+			var v8 = GuidKit.FromByteArray(bytesv8, bigEndian: true);
+
+			var bytesv7 = Guid.NewGuid().ToByteArray(bigEndian: true);
+			GuidKit.CreateVersion7(bytesv7, ts, ref seq, true);
+			var v7 = GuidKit.FromByteArray(bytesv7, bigEndian: true);
 
 			var i8 = (GuidInfoVersion7And8)v8.GetGuidInfo(GuidVersion8Type.MsSql);
 			var i7 = (GuidInfoVersion7And8)v7.GetGuidInfo();

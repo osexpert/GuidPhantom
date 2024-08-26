@@ -49,7 +49,7 @@ BEGIN
 	declare @seq int = convert(int, SESSION_CONTEXT(N'uuid.prev_sequence'))
 
 	declare @setSequence bit = 0
-	if (@now_unix_ms <= @prev_unix_ms) -- check for null?
+	if (@now_unix_ms <= @prev_unix_ms)
 	begin
 		set @now_unix_ms = @prev_unix_ms
 		set @seq += (case when @rand_1 = 0 then 42 else @rand_1 end)
@@ -117,7 +117,7 @@ BEGIN
 	declare @seq int = convert(int, SESSION_CONTEXT(N'uuid.prev_sequence'))
 
 	declare @setSequence bit = 0
-	if (@now_unix_ms <= @prev_unix_ms) -- check for null?
+	if (@now_unix_ms <= @prev_unix_ms)
 	begin
 		set @now_unix_ms = @prev_unix_ms
 		set @seq += (case when @rand_1 = 0 then 42 else @rand_1 end)

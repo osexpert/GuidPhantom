@@ -338,15 +338,19 @@ namespace GuidPhantom
 
 		private static Guid CreateVersion7Or8MsSql(DateTimeOffset timestamp, byte version)
 		{
+			var bytes = Guid.NewGuid().ToByteArray(bigEndian: true);
+
+			long now_ts = timestamp.ToUnixTimeMilliseconds();
+
 			lock (_lock)
 			{
-				long now_ts = timestamp.ToUnixTimeMilliseconds();
-
 				bool setSequence = false;
 				if (now_ts <= _prev_ts)
 				{
 					now_ts = _prev_ts.Value;
-					_sequence += GetRandomByteNotZero();
+
+					var rand_inc = bytes[version == 7 ? 0 : 10]; // use the first byte overwritten by clock
+					_sequence += (rand_inc == 0 ? 42 : rand_inc);
 
 					if (_sequence > 67_108_864)
 					{
@@ -361,29 +365,14 @@ namespace GuidPhantom
 				_prev_ts = now_ts;
 
 				if (version == 7)
-					return CreateVersion7(now_ts, ref _sequence, setSequence);
+					CreateVersion7(bytes, now_ts, ref _sequence, setSequence);
 				else if (version == 8)
-					return CreateVersion8MsSql(now_ts, ref _sequence, setSequence);
+					CreateVersion8MsSql(bytes, now_ts, ref _sequence, setSequence);
 				else
 					throw new InvalidOperationException("Not version 7 or 8");
 			}
-		}
 
-#if NET6_0_OR_GREATER
-#else
-		static Random _rand = new Random();
-#endif
-
-		private static byte GetRandomByteNotZero()
-		{
-			while (true)
-			{
-#if NET6_0_OR_GREATER
-				return (byte)(Random.Shared.Next(byte.MaxValue) + 1);
-#else
-				return (byte)(_rand.Next(byte.MaxValue) + 1);
-#endif
-			}
+			return FromByteArray(bytes, bigEndian: true);
 		}
 
 		/// <summary>
@@ -421,15 +410,10 @@ namespace GuidPhantom
 		/// <returns>Version8MsSql Guid</returns>
 		public static Guid CreateVersion8MsSql(DateTimeOffset timestamp) => CreateVersion7Or8MsSql(timestamp, 8);
 
-		internal static Guid CreateVersion7(long unix_ts_ms, ref int sequence, bool setSequence)
+		internal static void CreateVersion7(byte[] bytes, long unix_ts_ms, ref int sequence, bool setSequence)
 		{
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
-
-			// This isn't the most optimal way, but we don't have an easy way to get
-			// secure random bytes in corelib without doing this since the secure rng
-			// is in a different layer.
-			var bytes = Guid.NewGuid().ToByteArray(bigEndian: true);
 
 			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
 				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
@@ -459,15 +443,15 @@ namespace GuidPhantom
 			}
 			else
 			{
-				int currSeq = (int)(
+				// rollover guard: make top bit of counter initially 0
+				bytes[6] = (byte)(bytes[6] & 0b1111_0111);
+
+				sequence = (int)(
 					(bytes[6] & 0b0000_1111) << (8 + 6 + 8) |
 					bytes[7] << (8 + 6) |
 					(bytes[8] & 0b0011_1111) << 8 |
 					bytes[9]);
-				sequence = currSeq;
 			}
-
-			return FromByteArray(bytes, bigEndian: true);
 		}
 
 		/// <summary>
@@ -479,15 +463,10 @@ namespace GuidPhantom
 		/// </summary>
 		/// <param name="unix_ts_ms"></param>
 		/// <returns>Version8MsSql Guid</returns>
-		internal static Guid CreateVersion8MsSql(long unix_ts_ms, ref int sequence, bool setSequence)
+		internal static void CreateVersion8MsSql(byte[] bytes, long unix_ts_ms, ref int sequence, bool setSequence)
 		{
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
-
-			// This isn't the most optimal way, but we don't have an easy way to get
-			// secure random bytes in corelib without doing this since the secure rng
-			// is in a different layer.
-			var bytes = Guid.NewGuid().ToByteArray(bigEndian: true);
 
 			if ((bytes[8] & 0b1100_0000) != 0b1000_0000)
 				throw new InvalidOperationException("Not variant " + GuidVariant.IETF);
@@ -517,16 +496,16 @@ namespace GuidPhantom
 			}
 			else
 			{
-				int currSeq = (int)(
+				// rollover guard: make top bit of counter initially 0
+				bytes[8] = (byte)(bytes[8] & 0b1101_1111);
+
+				sequence = (int)(
 					(bytes[8] & 0b0011_1111) << (4 + 8 + 8) |
 					bytes[9] << (4 + 8) |
 					bytes[7] << 4 |
 					(bytes[6] & 0b0000_1111)
 					);
-				sequence = currSeq;
 			}
-
-			return FromByteArray(bytes, bigEndian: true);
 		}
 
 		/// <summary>

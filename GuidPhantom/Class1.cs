@@ -90,13 +90,13 @@ namespace GuidPhantom
     /// </summary>
     public class GuidInfoVersion1And6 : GuidInfoVersion
     {
-        public GuidInfoVersion1And6(GuidVariant variant, byte version, long timestamp, short sequence, byte[] node) : base(variant, version)
+        public GuidInfoVersion1And6(GuidVariant variant, byte version, long timestamp, short clock_sequence, byte[] node) : base(variant, version)
         {
             if (node.Length != 6)
                 throw new ArgumentException("Node must be 6 bytes");
 
             Timestamp = timestamp;
-            Sequence = sequence;
+            ClockSequence = clock_sequence;
             _node = node;
         }
 
@@ -124,7 +124,7 @@ namespace GuidPhantom
         ///  c) time goes back in time (compared to previously generated Guid)
         ///  Must fallback to randomly generated, if the counter is "lost".
         /// </summary>
-        public short Sequence { get; }
+        public short ClockSequence { get; }
 
 
         byte[] _node;

@@ -318,19 +318,6 @@ namespace GuidPhantom
 		/// <returns>Version 7 Guid</returns>
 		public static Guid CreateVersion7() => CreateVersion7Or8MsSql(DateTimeOffset.UtcNow, 7);
 
-		/// <summary>
-		/// Create monotonic (always increasing) version 7 Guid. NOTE: monotony is only per process.
-		/// 6 first bytes is unix timestamp in milliseconds.
-		/// 6 last bytes are random data.
-		/// 4 middle bytes (initially 26bits of random data) are used as counter (randomly increased between 1-255), in case the time does not advance between calls.
-		/// If the counter rollover (> 67_108_864) the timestamp is increased +1 ms.
-		/// 
-		/// This implementation DOES NOT match CreateVersion7 in .NET 9.
-		/// https://github.com/dotnet/runtime/blob/59c2ea578bd615a63d56e8ff4b1de0a6b824691f/src/libraries/System.Private.CoreLib/src/System/Guid.cs#L304
-		/// </summary>
-		/// <param name="timestamp"></param>
-		/// <returns>Version 7 Guid</returns>
-		public static Guid CreateVersion7(DateTimeOffset timestamp) => CreateVersion7Or8MsSql(timestamp, 7);
 
 		static long? _prev_ts = null;
 		static int _sequence = 0;
@@ -402,13 +389,6 @@ namespace GuidPhantom
 		/// </summary>
 		/// <returns>Version8MsSql Guid</returns>
 		public static Guid CreateVersion8MsSql() => CreateVersion7Or8MsSql(DateTimeOffset.UtcNow, 8);
-
-		/// <summary>
-		/// Same as CreateVersion7 but bits rearranged to make it ordered in MsSql (and then set as Version8)
-		/// </summary>
-		/// <param name="timestamp"></param>
-		/// <returns>Version8MsSql Guid</returns>
-		public static Guid CreateVersion8MsSql(DateTimeOffset timestamp) => CreateVersion7Or8MsSql(timestamp, 8);
 
 		internal static void CreateVersion7(byte[] bytes, long unix_ts_ms, ref int sequence, bool setSequence)
 		{

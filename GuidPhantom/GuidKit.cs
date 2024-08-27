@@ -333,7 +333,7 @@ namespace GuidPhantom
 				if (now_ts == _prev_ts)
 				{
 					_sequence++;
-					if (_sequence > 4095) // 2^12
+					if (_sequence > 8191)
 						_future++;
 					else
 						setSequence = true;
@@ -412,15 +412,18 @@ namespace GuidPhantom
 			// sequence
 			if (setSequence)
 			{
-				if (sequence < 0 || sequence > 4095) // 2^12
-					throw new ArgumentException("Sequence must be between 0 and 4095");
+				if (sequence < 0 || sequence > 8191)
+					throw new ArgumentException("Sequence must be between 0 and 8191");
 
-				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (sequence >> 8) & 0b0000_1111);
-				bytes[7] = (byte)sequence;
+				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (sequence >> (1 + 8)) & 0b0000_1111);
+				bytes[7] = (byte)(sequence >> 1);
+				bytes[8] = (byte)((bytes[8] & 0b1101_1111) | (sequence << 5) & 0b0010_0000);
 			}
 			else
 			{
-				sequence = (bytes[6] & 0b0000_1111) << 8 | bytes[7];
+				sequence = (bytes[6] & 0b0000_1111) << (1 + 8) |
+					(bytes[7] << 1) |
+					(bytes[8] & 0b0010_0000) >> 5;
 			}
 		}
 
@@ -456,15 +459,16 @@ namespace GuidPhantom
 			// sequence
 			if (setSequence)
 			{
-				if (sequence < 0 || sequence > 4095)
-					throw new ArgumentException("Sequence must be between 0 and 4095");
+				if (sequence < 0 || sequence > 8191)
+					throw new ArgumentException("Sequence must be between 0 and 8191");
 
-				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> 6) & 0b0011_1111);
-				bytes[9] = (byte)((bytes[9] & 0b0000_0011) | (sequence << 2) & 0b1111_1100);
+				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> 7) & 0b0011_1111);
+				bytes[9] = (byte)((bytes[9] & 0b0000_0001) | (sequence << 1) & 0b1111_1110);
 			}
 			else
 			{
-				sequence = (bytes[8] & 0b0011_1111) << 6 | (bytes[9] & 0b1111_1100) >> 2;
+				sequence = (bytes[8] & 0b0011_1111) << 7 |
+					(bytes[9] & 0b1111_1110) >> 1;
 			}
 		}
 

@@ -114,17 +114,17 @@ namespace GuidPhantom
             return start.AddTicks(Convert.ToInt64(Timestamp / 10000.0 * 10000));
         }
 
-        /// <summary>
-        /// 14bits sequence
-        /// It can be:
-        /// - random data for every Guid generated
-        /// - a randomly seeded counter (at boot) that is incremented (with 1) every time:
-        ///  a) the node changes
-        ///  b) time is the same as for previously generated Guid
-        ///  c) time goes back in time (compared to previously generated Guid)
-        ///  Must fallback to randomly generated, if the counter is "lost".
-        /// </summary>
-        public short ClockSequence { get; }
+		/// <summary>
+		/// 14bits sequence
+		/// Incremented + 1 or randomized every time
+		/// - node changes
+		/// - previously used timestamp is lost (eg. system reboot/power loss)
+		/// - time is adjusted back
+		/// 
+		/// If the previously used sequence is unknown, it should be randomized.
+		/// If the previously used sequence is known, it should be incremented + 1.
+		/// </summary>
+		public short ClockSequence { get; }
 
 
         byte[] _node;
@@ -168,13 +168,14 @@ namespace GuidPhantom
 
         public DateTimeOffset Time => GetTime();
 
-        /// <summary>
-        /// rand_a can be one of:
-        /// - 12bits random data
-        /// - 12bits fractional milliseconds (OPTIONAL)
-        /// - 12bits monotonic sequence (randomly seeded) (OPTIONAL)
-        /// </summary>
-        public short RandA { get; }
+		/// <summary>
+		/// 12bits
+		/// rand_a can for instance be:
+		/// - random data
+		/// - fractional milliseconds
+		/// - counter (randomly seeded)
+		/// </summary>
+		public short RandA { get; }
 
 		public long RandB { get; }
 

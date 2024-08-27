@@ -32,7 +32,7 @@ SELECT
 	CRYPT_GEN_RANDOM(10) AS rand_10
 GO
 
--- uuid v7: time + random
+-- uuid v7: time + random. A 12bit counter allows for ca. 4000 Uuid's per ms, before going into the future.
 -- Not ordered in ms sql server if stored as uniqueidentifier.
 -- Based on https://github.com/osexpert/GuidPhantom/blob/main/GuidPhantom/GuidKit.cs
 -- Returns big endian array
@@ -47,14 +47,14 @@ BEGIN
 	declare @now_unix_ms bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
 	declare @prev_unix_ms bigint = convert(bigint, SESSION_CONTEXT(N'uuid.unix_ms'))
-	declare @future_ms int = convert(int, SESSION_CONTEXT(N'uuid.future_ms'))
+	declare @future_ms int = coalesce(convert(int, SESSION_CONTEXT(N'uuid.future_ms')), 0)
 	declare @seq int = convert(int, SESSION_CONTEXT(N'uuid.sequence'))
 
 	declare @set_sequence bit = 0
 	if (@now_unix_ms = @prev_unix_ms)
 	begin
 		set @seq += 1
-		if (@seq > 4095) -- 2^12
+		if (@seq > 4095)
 			set @future_ms += 1
 		else
 			set @set_sequence = 1
@@ -64,7 +64,7 @@ BEGIN
 	else if (@now_unix_ms > @prev_unix_ms)
 	begin
 		set @future_ms = @prev_unix_ms + @future_ms - @now_unix_ms
-		if (@future_ms < 0) set @@future_ms = 0
+		if (@future_ms < 0) set @future_ms = 0
 	end
 
 	declare @bytes_6 binary = SUBSTRING(@rand, 1, 1)
@@ -124,14 +124,14 @@ BEGIN
 	declare @now_unix_ms bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
 	declare @prev_unix_ms bigint = convert(bigint, SESSION_CONTEXT(N'uuid.unix_ms'))
-	declare @future_ms int = convert(int, SESSION_CONTEXT(N'uuid.future_ms'))
+	declare @future_ms int = coalesce(convert(int, SESSION_CONTEXT(N'uuid.future_ms')), 0)
 	declare @seq int = convert(int, SESSION_CONTEXT(N'uuid.sequence'))
 
 	declare @set_sequence bit = 0
 	if (@now_unix_ms = @prev_unix_ms)
 	begin
 		set @seq += 1
-		if (@seq > 4095) -- 2^12
+		if (@seq > 4095)
 			set @future_ms += 1
 		else
 			set @set_sequence = 1
@@ -141,7 +141,7 @@ BEGIN
 	else if (@now_unix_ms > @prev_unix_ms)
 	begin
 		set @future_ms = @prev_unix_ms + @future_ms - @now_unix_ms
-		if (@future_ms < 0) set @@future_ms = 0
+		if (@future_ms < 0) set @future_ms = 0
 	end
 
 	declare @bytes_6 binary = SUBSTRING(@rand, 7, 1)
@@ -262,6 +262,10 @@ select case when dbo.uuid_v8mssql_from_v7(dbo.uuid_v7_from_v8mssql('dc0c0c07-398
 -- defacto snapshot from GuidPhantom
 select case when dbo.uuid_v7_from_v8mssql('dc0c0c07-398f-848c-b30d-017f22e279b0') = '017F22E2-79B0-7CC3-98C4-DC0C0C07398F' then 'pass' else 'fail' end
 select case when dbo.uuid_v8mssql_from_v7('017F22E2-79B0-7CC3-98C4-DC0C0C07398F') = 'dc0c0c07-398f-848c-b30d-017f22e279b0' then 'pass' else 'fail' end
+
+EXEC sp_set_session_context 'uuid.unix_ms', NULL  
+EXEC sp_set_session_context 'uuid.future_ms', NULL
+EXEC sp_set_session_context 'uuid.sequence', NULL
 
 IF OBJECT_ID('UuidFragTest') IS NOT NULL drop table UuidFragTest
 GO

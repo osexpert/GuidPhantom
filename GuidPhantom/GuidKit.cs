@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 
 [assembly: InternalsVisibleTo("GuidPhantom.Tests")]
+[assembly: InternalsVisibleTo("ConsoleApp1")]
 
 namespace GuidPhantom
 {
@@ -306,11 +307,7 @@ namespace GuidPhantom
 		public static Guid CreateVersion4() => Guid.NewGuid();
 
 		/// <summary>
-		/// Create monotonic (always increasing) version 7 Guid. NOTE: monotony is only per process.
-		/// 6 first bytes are unix timestamp in milliseconds.
-		/// 6 last bytes are random data.
-		/// 4 middle bytes (initially 26bits of random data) are used as counter (randomly increased between 1-255), in case the time does not advance between calls.
-		/// If the counter rollover (> 67_108_864) the timestamp is increased +1 ms.
+		/// Create monotonicversion 7 Guid. NOTE: monotony is only per process.
 		/// 
 		/// This implementation DOES NOT match CreateVersion7 in .NET 9.
 		/// https://github.com/dotnet/runtime/blob/59c2ea578bd615a63d56e8ff4b1de0a6b824691f/src/libraries/System.Private.CoreLib/src/System/Guid.cs#L304
@@ -321,6 +318,7 @@ namespace GuidPhantom
 
 		static long? _prev_ts = null;
 		static int _sequence = 0;
+		internal static int _future = 0;
 		static object _lock = new();
 
 		private static Guid CreateVersion7Or8MsSql(DateTimeOffset timestamp, byte version)
@@ -332,29 +330,30 @@ namespace GuidPhantom
 			lock (_lock)
 			{
 				bool setSequence = false;
-				if (now_ts <= _prev_ts)
+				if (now_ts == _prev_ts)
 				{
-					now_ts = _prev_ts.Value;
-
-					var rand_inc = bytes[version == 7 ? 0 : 10]; // use the first byte overwritten by timestamp
-					_sequence += (rand_inc == 0 ? 42 : rand_inc);
-
-					if (_sequence > 67_108_864)
-					{
-						now_ts++;
-					}
+					_sequence++;
+					if (_sequence > 4095) // 2^12
+						_future++;
 					else
-					{
 						setSequence = true;
-					}
 				}
-
+				else if (now_ts < _prev_ts)
+				{
+					_future = 0;
+				}
+				else if (now_ts > _prev_ts)
+				{
+					_future = (int)(_prev_ts + _future - now_ts);
+					if (_future < 0)
+						_future = 0;
+				}
 				_prev_ts = now_ts;
 
 				if (version == 7)
-					CreateVersion7(bytes, now_ts, ref _sequence, setSequence);
+					CreateVersion7(bytes, now_ts + _future, ref _sequence, setSequence);
 				else if (version == 8)
-					CreateVersion8MsSql(bytes, now_ts, ref _sequence, setSequence);
+					CreateVersion8MsSql(bytes, now_ts + _future, ref _sequence, setSequence);
 				else
 					throw new InvalidOperationException("Not version 7 or 8");
 			}
@@ -413,24 +412,15 @@ namespace GuidPhantom
 			// sequence
 			if (setSequence)
 			{
-				if (sequence < 0 || sequence > 67_108_864) // 2^26  // 4095)
-					throw new ArgumentException("Sequence must be between 0 and 67_108_864");
+				if (sequence < 0 || sequence > 4095) // 2^12
+					throw new ArgumentException("Sequence must be between 0 and 4095");
 
-				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (sequence >> (8 + 6 + 8)) & 0b0000_1111);
-				bytes[7] = (byte)(sequence >> (8 + 6));
-				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> 8) & 0b0011_1111);
-				bytes[9] = (byte)sequence;
+				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (sequence >> 8) & 0b0000_1111);
+				bytes[7] = (byte)sequence;
 			}
 			else
 			{
-				// rollover guard: make top bit of counter initially 0
-				bytes[6] = (byte)(bytes[6] & 0b1111_0111);
-
-				sequence = (int)(
-					(bytes[6] & 0b0000_1111) << (8 + 6 + 8) |
-					bytes[7] << (8 + 6) |
-					(bytes[8] & 0b0011_1111) << 8 |
-					bytes[9]);
+				sequence = (bytes[6] & 0b0000_1111) << 8 | bytes[7];
 			}
 		}
 
@@ -466,25 +456,15 @@ namespace GuidPhantom
 			// sequence
 			if (setSequence)
 			{
-				if (sequence < 0 || sequence > 67_108_864)
-					throw new ArgumentException("Sequence must be between 0 and 67_108_864");
+				if (sequence < 0 || sequence > 4095)
+					throw new ArgumentException("Sequence must be between 0 and 4095");
 
-				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> (4 + 8 + 8)) & 0b0011_1111);
-				bytes[9] = (byte)(sequence >> (4 + 8));
-				bytes[7] = (byte)(sequence >> 4);
-				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | sequence & 0b0000_1111);
+				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> 6) & 0b0011_1111);
+				bytes[9] = (byte)((bytes[9] & 0b0000_0011) | (sequence << 2) & 0b1111_1100);
 			}
 			else
 			{
-				// rollover guard: make top bit of counter initially 0
-				bytes[8] = (byte)(bytes[8] & 0b1101_1111);
-
-				sequence = (int)(
-					(bytes[8] & 0b0011_1111) << (4 + 8 + 8) |
-					bytes[9] << (4 + 8) |
-					bytes[7] << 4 |
-					(bytes[6] & 0b0000_1111)
-					);
+				sequence = (bytes[8] & 0b0011_1111) << 6 | (bytes[9] & 0b1111_1100) >> 2;
 			}
 		}
 

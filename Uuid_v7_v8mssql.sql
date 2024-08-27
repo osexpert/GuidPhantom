@@ -29,8 +29,7 @@ CREATE VIEW uuid_v7_data
 AS
 SELECT 
 	SYSUTCDATETIME() AS utc_now,
-	CRYPT_GEN_RANDOM(10) AS rand_10,
-	CRYPT_GEN_RANDOM(1) AS rand_1
+	CRYPT_GEN_RANDOM(10) AS rand_10
 GO
 
 -- uuid v7: time + random
@@ -43,24 +42,29 @@ WITH EXECUTE AS CALLER
 AS
 BEGIN
 	declare @rand binary(10)
-	declare @rand_1 binary
 	declare @utc_now datetime2
-	select @utc_now = utc_now, @rand = rand_10, @rand_1 = rand_1 from uuid_v7_data
+	select @utc_now = utc_now, @rand = rand_10 from uuid_v7_data
 	declare @now_unix_ms bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
-	declare @prev_unix_ms bigint = convert(bigint, SESSION_CONTEXT(N'uuid.prev_unix_ms'))
-	declare @seq int = convert(int, SESSION_CONTEXT(N'uuid.prev_sequence'))
+	declare @prev_unix_ms bigint = convert(bigint, SESSION_CONTEXT(N'uuid.unix_ms'))
+	declare @future_ms int = convert(int, SESSION_CONTEXT(N'uuid.future_ms'))
+	declare @seq int = convert(int, SESSION_CONTEXT(N'uuid.sequence'))
 
-	declare @setSequence bit = 0
-	if (@now_unix_ms <= @prev_unix_ms)
+	declare @set_sequence bit = 0
+	if (@now_unix_ms = @prev_unix_ms)
 	begin
-		set @now_unix_ms = @prev_unix_ms
-		set @seq += (case when @rand_1 = 0 then 42 else @rand_1 end)
-
-		if (@seq > 67108864) -- 2^26
-			set @now_unix_ms += 1
+		set @seq += 1
+		if (@seq > 4095) -- 2^12
+			set @future_ms += 1
 		else
-			set @setSequence = 1
+			set @set_sequence = 1
+	end
+	else if (@now_unix_ms < @prev_unix_ms)
+		set @future_ms = 0
+	else if (@now_unix_ms > @prev_unix_ms)
+	begin
+		set @future_ms = @prev_unix_ms + @future_ms - @now_unix_ms
+		if (@future_ms < 0) set @@future_ms = 0
 	end
 
 	declare @bytes_6 binary = SUBSTRING(@rand, 1, 1)
@@ -73,33 +77,21 @@ BEGIN
 	-- set variant IETF
 	set @bytes_8 = (@bytes_8 & 63) | 128
 
-	if (@setSequence = 1)
+	if (@set_sequence = 1)
 	begin
-		if (@seq < 0 or @seq > 67108864) set @seq = 42 / 0 -- generate div by zero
-			--throw new ArgumentException("Sequence must be between 0 and 67_108_864");
-		set @bytes_6 = (@bytes_6 & 240) | ((@seq / 4194304) & 15)
-		set @bytes_7 = @seq / 16384
-		set @bytes_8 = (@bytes_8 & 192) | ((@seq / 256) & 63)
-		set @bytes_9 = @seq
+		if (@seq < 0 or @seq > 4095) set @seq = 42 / 0 -- generate div by zero
+		set @bytes_6 = (@bytes_6 & 240) | ((@seq / 256) & 15)
+		set @bytes_7 = @seq
 	end
 	else
-	begin
-		-- rollover guard: make top bit of counter initially 0
-		set @bytes_6 = @bytes_6 & 247;
+		set @seq = ((@bytes_6 & 15) * 256) | @bytes_7
 
-		set @seq = 
-			((@bytes_6 & 15) * 4194304) |
-			(@bytes_7 * 16384) |
-			((@bytes_8 & 63) * 256) |
-			@bytes_9
-	end
+	EXEC sp_set_session_context 'uuid.unix_ms', @now_unix_ms;  
+	EXEC sp_set_session_context 'uuid.future_ms', @future_ms;  
+	EXEC sp_set_session_context 'uuid.sequence', @seq;
 
-	EXEC sp_set_session_context 'uuid.prev_unix_ms', @now_unix_ms;  
-	EXEC sp_set_session_context 'uuid.prev_sequence', @seq;
-
-	declare @time binary(6) = cast(@now_unix_ms as binary(6))
+	declare @time binary(6) = cast((@now_unix_ms + @future_ms) as binary(6))
 	declare @uuid binary(16) = @time + @bytes_6 + @bytes_7 + @bytes_8 + @bytes_9 + SUBSTRING(@rand, 5, 6)
-
 	return @uuid
 END
 GO
@@ -127,24 +119,29 @@ WITH EXECUTE AS CALLER
 AS
 BEGIN
 	declare @rand binary(10)
-	declare @rand_1 binary
 	declare @utc_now datetime2
-	select @utc_now = utc_now, @rand = rand_10, @rand_1 = rand_1 from uuid_v7_data
+	select @utc_now = utc_now, @rand = rand_10 from uuid_v7_data
 	declare @now_unix_ms bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
-	declare @prev_unix_ms bigint = convert(bigint, SESSION_CONTEXT(N'uuid.prev_unix_ms'))
-	declare @seq int = convert(int, SESSION_CONTEXT(N'uuid.prev_sequence'))
+	declare @prev_unix_ms bigint = convert(bigint, SESSION_CONTEXT(N'uuid.unix_ms'))
+	declare @future_ms int = convert(int, SESSION_CONTEXT(N'uuid.future_ms'))
+	declare @seq int = convert(int, SESSION_CONTEXT(N'uuid.sequence'))
 
-	declare @setSequence bit = 0
-	if (@now_unix_ms <= @prev_unix_ms)
+	declare @set_sequence bit = 0
+	if (@now_unix_ms = @prev_unix_ms)
 	begin
-		set @now_unix_ms = @prev_unix_ms
-		set @seq += (case when @rand_1 = 0 then 42 else @rand_1 end)
-
-		if (@seq > 67108864) -- 2^26
-			set @now_unix_ms += 1
+		set @seq += 1
+		if (@seq > 4095) -- 2^12
+			set @future_ms += 1
 		else
-			set @setSequence = 1
+			set @set_sequence = 1
+	end
+	else if (@now_unix_ms < @prev_unix_ms)
+		set @future_ms = 0
+	else if (@now_unix_ms > @prev_unix_ms)
+	begin
+		set @future_ms = @prev_unix_ms + @future_ms - @now_unix_ms
+		if (@future_ms < 0) set @@future_ms = 0
 	end
 
 	declare @bytes_6 binary = SUBSTRING(@rand, 7, 1)
@@ -157,33 +154,21 @@ BEGIN
 	-- set variant IETF
 	set @bytes_8 = (@bytes_8 & 63) | 128
 
-	if (@setSequence = 1)
+	if (@set_sequence = 1)
 	begin
-		if (@seq < 0 or @seq > 67108864) set @seq = 42 / 0 -- generate div by zero
-			--throw new ArgumentException("Sequence must be between 0 and 67_108_864");
-		set @bytes_8 = (@bytes_8 & 192) | ((@seq / 1048576) & 63);
-		set @bytes_9 = @seq / 4096;
-		set @bytes_7 = @seq / 16;
-		set @bytes_6 = (@bytes_6 & 240) | (@seq & 15);
+		if (@seq < 0 or @seq > 4095) set @seq = 42 / 0 -- generate div by zero
+		set @bytes_8 = (@bytes_8 & 192) | ((@seq / 64) & 63)
+		set @bytes_9 = (@bytes_9 & 3) | ((@seq * 4) & 252)
 	end
 	else
-	begin
-		-- rollover guard: make top bit of counter initially 0
-		set @bytes_8 = @bytes_8 & 223
+		set @seq = ((@bytes_8 & 63) * 64) | ((@bytes_9 & 252) / 4)
 
-		set @seq = 
-			((@bytes_8 & 63) * 1048576) |
-			(@bytes_9 * 4096) |
-			(@bytes_7 * 16) |
-			(@bytes_6 & 15)
-	end
+	EXEC sp_set_session_context 'uuid.unix_ms', @now_unix_ms;  
+	EXEC sp_set_session_context 'uuid.future_ms', @future_ms;
+	EXEC sp_set_session_context 'uuid.sequence', @seq;
 
-	EXEC sp_set_session_context 'uuid.prev_unix_ms', @now_unix_ms;  
-	EXEC sp_set_session_context 'uuid.prev_sequence', @seq;
-
-	declare @time binary(6) = cast(@now_unix_ms as binary(6))
+	declare @time binary(6) = cast((@now_unix_ms + @future_ms) as binary(6))
 	declare @uuid binary(16) = SUBSTRING(@rand, 1, 6) + @bytes_6 + @bytes_7 + @bytes_8 + @bytes_9 + @time
-
 	return @uuid
 END
 GO

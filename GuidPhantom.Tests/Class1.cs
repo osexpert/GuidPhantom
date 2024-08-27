@@ -346,30 +346,64 @@ namespace GuidPhantom.Tests
 		[TestMethod]
 		public void InternalSequence()
 		{
+			for (int x = 0; x < 1000; x++)
+			{
+
 #if NET6_0_OR_GREATER
-			long ts = Random.Shared.NextInt64();
-			int seq = Random.Shared.Next(67_108_864 + 1);
+				long ts = Random.Shared.NextInt64();
+				int seq = Random.Shared.Next(4095 + 1);
 #else
-			long ts = _rand.Next();
-			int seq = _rand.Next(67_108_864 + 1);
+				long ts = _rand.Next();
+				int seq = _rand.Next(4095 + 1);
 #endif
 
-			var bytesv8 = Guid.NewGuid().ToByteArray(bigEndian: true);
-			GuidKit.CreateVersion8MsSql(bytesv8, ts, ref seq, true);
-			var v8 = GuidKit.FromByteArray(bytesv8, bigEndian: true);
+				var bytesOrg = Guid.NewGuid().ToByteArray(bigEndian: true);
 
-			var bytesv7 = Guid.NewGuid().ToByteArray(bigEndian: true);
-			GuidKit.CreateVersion7(bytesv7, ts, ref seq, true);
-			var v7 = GuidKit.FromByteArray(bytesv7, bigEndian: true);
+				var bytesCpy1 = CopyBytes(bytesOrg);
+				// get seq
+				GuidKit.CreateVersion8MsSql(bytesCpy1, ts, ref seq, false);
+				// set seq		
+				var bytesCpy2 = CopyBytes(bytesOrg);
+				GuidKit.CreateVersion8MsSql(bytesCpy2, ts, ref seq, true);
+				// check bytes match
+				Assert.IsTrue(bytesCpy1.SequenceEqual(bytesCpy2));
 
-			var i8 = (GuidInfoVersion7And8)v8.GetGuidInfo(GuidVersion8Type.MsSql);
-			var i7 = (GuidInfoVersion7And8)v7.GetGuidInfo();
+				
 
-			//Assert.AreEqual(v8, v7.ConvertVersion7To8MsSql());
-			//Assert.AreEqual(v7, v8.ConvertVersion8MsSqlTo7());
+				//var bytesv7 = Guid.NewGuid().ToByteArray(bigEndian: true);
 
-			Assert.AreEqual(i7.Timestamp, i8.Timestamp);
-			Assert.AreEqual(i7.RandA, i8.RandA);
+				var bytesCpy3 = CopyBytes(bytesOrg);
+				GuidKit.CreateVersion7(bytesCpy3, ts, ref seq, false);
+				var bytesCpy4 = CopyBytes(bytesOrg);
+				GuidKit.CreateVersion7(bytesCpy4, ts, ref seq, true);
+				Assert.IsTrue(bytesCpy3.SequenceEqual(bytesCpy4));
+
+
+				var bytesCpy5 = CopyBytes(bytesOrg);
+				var bytesCpy6 = CopyBytes(bytesOrg);
+
+				GuidKit.CreateVersion7(bytesCpy5, ts, ref seq, true);
+				GuidKit.CreateVersion8MsSql(bytesCpy6, ts, ref seq, true);
+
+				var v7 = GuidKit.FromByteArray(bytesCpy5, bigEndian: true);
+				var v8 = GuidKit.FromByteArray(bytesCpy6, bigEndian: true);
+
+				var i8 = (GuidInfoVersion7And8)v8.GetGuidInfo(GuidVersion8Type.MsSql);
+				var i7 = (GuidInfoVersion7And8)v7.GetGuidInfo();
+
+//				Assert.AreEqual(v8, v7.ConvertVersion7To8MsSql());
+	//			Assert.AreEqual(v7, v8.ConvertVersion8MsSqlTo7());
+
+				Assert.AreEqual(i7.Timestamp, i8.Timestamp);
+				Assert.AreEqual(i7.RandA, i8.RandA);
+			}
+		}
+
+		private byte[] CopyBytes(byte[] bytes)
+		{
+			var cpy = new byte[bytes.Length];
+			Array.Copy(bytes, cpy, bytes.Length);
+			return cpy;
 		}
 
 		//[TestMethod]

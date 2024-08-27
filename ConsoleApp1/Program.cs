@@ -9,6 +9,51 @@ namespace ConsoleApp1
     {
         public static void Main()
         {
+
+			var s = Stopwatch.StartNew();
+			var n = DateTimeOffset.UtcNow;
+			Guid? last = null;
+			for (int i = 0; i <= 100_000_000; i++)
+			{
+				var v777 = GuidKit.CreateVersion7();
+				if ((i % 1_000_000) == 0)
+					Console.WriteLine(v777 + " fut:" + GuidKit._future);
+				//var v777 = Guid.NewGuid();
+				if (i == 100_000_000)//
+					last = v777;
+			}
+			s.Stop();
+			Console.WriteLine("" + s.ElapsedMilliseconds + "ms");
+			//Console.WriteLine("incs" + GuidKit.incs);
+			Console.WriteLine("curr ts" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+			Console.WriteLine("last ts" + ((GuidInfoVersion7And8)last!.Value.GetGuidInfo()).Timestamp);
+
+			Console.WriteLine("slower");
+
+			for (int i = 0; i <= 10_000_000; i++)
+			{
+				var v777 = GuidKit.CreateVersion7();
+				if ((i % 100_000) == 0)
+				{
+					Console.WriteLine(v777 + " fut:" + GuidKit._future);
+					
+				}
+
+				if ((i % 1000) == 0)
+				{
+					Thread.Sleep(10);
+				}
+					//var v777 = Guid.NewGuid();
+					//if (i == 100_000_000)//
+					//last = v777;
+
+				}
+
+			Console.WriteLine("end " + GuidKit._future);
+
+			return;
+
+
 			var gg131 = GuidKit.FromHexString("0x01918D8D60A77B77922D5F5A89EE07BF", bigEndian: true);
 			// gg131 = {01918d8d-60a7-7b77-922d-5f5a89ee07bf}
 			var gg138 = GuidKit.FromHexString("0x01918D8D60A77B778951ADD260B48EEE", bigEndian: true);
@@ -46,24 +91,6 @@ namespace ConsoleApp1
 			int inc42 = inc.ReverseIncrementedGuid(new Guid("d2f2f0fe-cbf8-4dc8-9ecb-eedd066dc105"));
 
 
-			var s = Stopwatch.StartNew();
-			var n = DateTimeOffset.UtcNow;
-			Guid? last=null;
-			for (int i=0; i<=100_000_000; i++)
-			{
-				var v777 = GuidKit.CreateVersion7();
-				if ((i % 1_000_000) == 0)
-					Console.WriteLine(v777);
-				//var v777 = Guid.NewGuid();
-				if (i == 100_000_000)
-					last = v777;
-			}
-			s.Stop();
-			Console.WriteLine("" + s.ElapsedMilliseconds + "ms");
-			//Console.WriteLine("incs" + GuidKit.incs);
-			Console.WriteLine("curr ts" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-			Console.WriteLine("last ts" + ((GuidInfoVersion7And8) last!.Value.GetGuidInfo()).Timestamp);
-			return;
 
 			foreach (var x in Take(100000, () => GuidKit.CreateVersion7()))
 				Console.WriteLine(x);

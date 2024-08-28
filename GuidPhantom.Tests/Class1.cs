@@ -23,7 +23,7 @@ namespace GuidPhantom.Tests
 		public void Ver7SequenceRising()
 		{
 			Guid? prev = null;
-			foreach (var h in Take(1000, () => GuidKit.CreateVersion7()).ToList())
+			foreach (var h in Take(10000, () => GuidKit.CreateVersion7()).ToList())
 			{
 				if (prev != null && h.CompareTo(prev.Value) <= 0)
 				{
@@ -58,7 +58,7 @@ namespace GuidPhantom.Tests
 		{
 			Guid? prev = null;
 			//int i = 0;
-			foreach (var h in Take(1000, () => GuidKit.CreateVersion8MsSql()).ToList())
+			foreach (var h in Take(10000, () => GuidKit.CreateVersion8MsSql()).ToList())
 			{
 				// https://github.com/microsoft/referencesource/blob/master/System.Data/System/Data/SQLTypes/SQLGuid.cs
 				// if (prev != null && h.ConvertVersion8MsSqlTo7().CompareTo(prev.Value.ConvertVersion8MsSqlTo7()) <= 0)
@@ -76,7 +76,7 @@ namespace GuidPhantom.Tests
 		{
 			Guid? prev = null;
 			//int i = 0;
-			for (int d = 0; d < 1000; d++)
+			for (int d = 0; d < 10000; d++)
 			{
 				var h = GuidKit.CreateNEWSEQUENTIALID();
 
@@ -346,7 +346,7 @@ namespace GuidPhantom.Tests
 		[TestMethod]
 		public void InternalSequence()
 		{
-			for (int x = 0; x < 1000; x++)
+			for (int x = 0; x < 10000; x++)
 			{
 
 #if NET6_0_OR_GREATER

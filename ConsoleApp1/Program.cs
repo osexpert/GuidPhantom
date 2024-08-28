@@ -17,7 +17,7 @@ namespace ConsoleApp1
 			{
 				var v777 = GuidKit.CreateVersion7();
 				if ((i % 1_000_000) == 0)
-					Console.WriteLine(v777 + " fut:" + GuidKit._future);
+					Console.WriteLine(v777 + " fut:" + GuidKit.Future);
 				//var v777 = Guid.NewGuid();
 				if (i == 100_000_000)//
 					last = v777;
@@ -35,7 +35,7 @@ namespace ConsoleApp1
 				var v777 = GuidKit.CreateVersion7();
 				if ((i % 100_000) == 0)
 				{
-					Console.WriteLine(v777 + " fut:" + GuidKit._future);
+					Console.WriteLine(v777 + " fut:" + GuidKit.Future);
 					
 				}
 
@@ -49,7 +49,7 @@ namespace ConsoleApp1
 
 				}
 
-			Console.WriteLine("end " + GuidKit._future);
+			Console.WriteLine("end " + GuidKit.Future);
 
 			return;
 

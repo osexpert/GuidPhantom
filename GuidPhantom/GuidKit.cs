@@ -307,7 +307,9 @@ namespace GuidPhantom
 		public static Guid CreateVersion4() => Guid.NewGuid();
 
 		/// <summary>
-		/// Create monotonicversion 7 Guid. NOTE: monotony is only per process.
+		/// Create monotonicversion 7 Guid.
+		/// NOTE: Monotony breaks if clock goes back in time.
+		/// NOTE: monotony is only per process.
 		/// 
 		/// This implementation DOES NOT match CreateVersion7 in .NET 9.
 		/// https://github.com/dotnet/runtime/blob/59c2ea578bd615a63d56e8ff4b1de0a6b824691f/src/libraries/System.Private.CoreLib/src/System/Guid.cs#L304
@@ -317,9 +319,14 @@ namespace GuidPhantom
 
 
 		static long? _prev_ts = null;
+		static long? _calc_ts = null;
 		static int _sequence = 0;
-		internal static int _future = 0;
 		static object _lock = new();
+
+		/// <summary>
+		/// Dirty/ulocked read of how far the calculated timestamp is into the future. Only for testing.
+		/// </summary>
+		internal static long? Future => _calc_ts - _prev_ts;
 
 		private static Guid CreateVersion7Or8MsSql(DateTimeOffset timestamp, byte version)
 		{
@@ -330,30 +337,28 @@ namespace GuidPhantom
 			lock (_lock)
 			{
 				bool setSequence = false;
-				if (now_ts == _prev_ts)
+				if (now_ts < _prev_ts)
+				{
+					_calc_ts = now_ts; // clock going back (do not try to handle)
+				}
+				else if (now_ts <= _calc_ts)
 				{
 					_sequence++;
 					if (_sequence > 8191)
-						_future++;
+						_calc_ts++;
 					else
 						setSequence = true;
 				}
-				else if (now_ts < _prev_ts)
+				else
 				{
-					_future = 0;
-				}
-				else if (now_ts > _prev_ts)
-				{
-					_future = (int)(_prev_ts + _future - now_ts);
-					if (_future < 0)
-						_future = 0;
+					_calc_ts = now_ts;
 				}
 				_prev_ts = now_ts;
 
 				if (version == 7)
-					CreateVersion7(bytes, now_ts + _future, ref _sequence, setSequence);
+					CreateVersion7(bytes, _calc_ts.Value, ref _sequence, setSequence);
 				else if (version == 8)
-					CreateVersion8MsSql(bytes, now_ts + _future, ref _sequence, setSequence);
+					CreateVersion8MsSql(bytes, _calc_ts.Value, ref _sequence, setSequence);
 				else
 					throw new InvalidOperationException("Not version 7 or 8");
 			}

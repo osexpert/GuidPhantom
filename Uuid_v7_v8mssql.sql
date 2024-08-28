@@ -1,11 +1,11 @@
-IF OBJECT_ID('uuid_swap_endian') IS NOT NULL drop function uuid_swap_endian
-IF OBJECT_ID('uuid_v7_data') IS NOT NULL DROP VIEW uuid_v7_data
-IF OBJECT_ID('uuid_v7') IS NOT NULL drop function uuid_v7
 IF OBJECT_ID('uuid_v7_array') IS NOT NULL drop function uuid_v7_array
-IF OBJECT_ID('uuid_v8mssql') IS NOT NULL drop function uuid_v8mssql
+IF OBJECT_ID('uuid_v7') IS NOT NULL drop function uuid_v7
 IF OBJECT_ID('uuid_v8mssql_array') IS NOT NULL drop function uuid_v8mssql_array
+IF OBJECT_ID('uuid_v8mssql') IS NOT NULL drop function uuid_v8mssql
 IF OBJECT_ID('uuid_v8mssql_from_v7') IS NOT NULL drop function uuid_v8mssql_from_v7
 IF OBJECT_ID('uuid_v7_from_v8mssql') IS NOT NULL drop function uuid_v7_from_v8mssql
+IF OBJECT_ID('uuid_swap_endian') IS NOT NULL drop function uuid_swap_endian
+IF OBJECT_ID('uuid_v7_data') IS NOT NULL DROP VIEW uuid_v7_data
 GO
 
 CREATE FUNCTION uuid_swap_endian (@uuid binary(16))
@@ -32,7 +32,7 @@ SELECT
 	CRYPT_GEN_RANDOM(10) AS rand_10
 GO
 
--- uuid v7: time + random. A 12bit counter allows for ca. 4000 Uuid's per ms, before going into the future.
+-- uuid v7: time + 13bit random / counter + random
 -- Not ordered in ms sql server if stored as uniqueidentifier.
 -- Based on https://github.com/osexpert/GuidPhantom/blob/main/GuidPhantom/GuidKit.cs
 -- Returns big endian array
@@ -44,29 +44,26 @@ BEGIN
 	declare @rand binary(10)
 	declare @utc_now datetime2
 	select @utc_now = utc_now, @rand = rand_10 from uuid_v7_data
-	declare @now_unix_ms bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
+	declare @now_ts bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
-	declare @prev_unix_ms bigint = convert(bigint, SESSION_CONTEXT(N'uuid.unix_ms'))
-	declare @future_ms int = coalesce(convert(int, SESSION_CONTEXT(N'uuid.future_ms')), 0)
-	declare @seq int = convert(int, SESSION_CONTEXT(N'uuid.sequence'))
+	declare @prev_ts bigint = convert(bigint, SESSION_CONTEXT(N'uuidv7.prev_ts'))
+	declare @calc_ts bigint = convert(bigint, SESSION_CONTEXT(N'uuidv7.calc_ts'))
+	declare @seq int = convert(int, SESSION_CONTEXT(N'uuidv7.sequence'))
 
 	declare @set_sequence bit = 0
-	if (@now_unix_ms = @prev_unix_ms)
+	if (@now_ts < @prev_ts)
+		set @calc_ts = @now_ts -- clock going back (do not try to handle)
+	else if (@now_ts <= @calc_ts)
 	begin
 		set @seq += 1
-		if (@seq > 4095)
-			set @future_ms += 1
+		if (@seq > 8191)
+			set @calc_ts += 1
 		else
 			set @set_sequence = 1
 	end
-	else if (@now_unix_ms < @prev_unix_ms)
-		set @future_ms = 0
-	else if (@now_unix_ms > @prev_unix_ms)
-	begin
-		set @future_ms = @prev_unix_ms + @future_ms - @now_unix_ms
-		if (@future_ms < 0) set @future_ms = 0
-	end
-
+	else
+		set @calc_ts = @now_ts
+	
 	declare @bytes_6 binary = SUBSTRING(@rand, 1, 1)
 	declare @bytes_7 binary = SUBSTRING(@rand, 2, 1)
 	declare @bytes_8 binary = SUBSTRING(@rand, 3, 1)
@@ -79,18 +76,19 @@ BEGIN
 
 	if (@set_sequence = 1)
 	begin
-		if (@seq < 0 or @seq > 4095) set @seq = 42 / 0 -- generate div by zero
-		set @bytes_6 = (@bytes_6 & 240) | ((@seq / 256) & 15)
-		set @bytes_7 = @seq
+		if (@seq < 0 or @seq > 8191) set @seq = 42 / 0 -- generate div by zero
+		set @bytes_6 = (@bytes_6 & 240) | ((@seq / 512) & 15)
+		set @bytes_7 = @seq / 2
+		set @bytes_8 = (@bytes_8 & 223) | ((@seq * 32) & 32)
 	end
 	else
-		set @seq = ((@bytes_6 & 15) * 256) | @bytes_7
+		set @seq = ((@bytes_6 & 15) * 512) | (@bytes_7 * 2) | ((@bytes_8 & 32) / 32)
 
-	EXEC sp_set_session_context 'uuid.unix_ms', @now_unix_ms;  
-	EXEC sp_set_session_context 'uuid.future_ms', @future_ms;  
-	EXEC sp_set_session_context 'uuid.sequence', @seq;
+	EXEC sp_set_session_context 'uuidv7.prev_ts', @now_ts;  
+	EXEC sp_set_session_context 'uuidv7.calc_ts', @calc_ts;
+	EXEC sp_set_session_context 'uuidv7.sequence', @seq;
 
-	declare @time binary(6) = cast((@now_unix_ms + @future_ms) as binary(6))
+	declare @time binary(6) = cast(@calc_ts as binary(6))
 	declare @uuid binary(16) = @time + @bytes_6 + @bytes_7 + @bytes_8 + @bytes_9 + SUBSTRING(@rand, 5, 6)
 	return @uuid
 END
@@ -121,28 +119,25 @@ BEGIN
 	declare @rand binary(10)
 	declare @utc_now datetime2
 	select @utc_now = utc_now, @rand = rand_10 from uuid_v7_data
-	declare @now_unix_ms bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
+	declare @now_ts bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
-	declare @prev_unix_ms bigint = convert(bigint, SESSION_CONTEXT(N'uuid.unix_ms'))
-	declare @future_ms int = coalesce(convert(int, SESSION_CONTEXT(N'uuid.future_ms')), 0)
-	declare @seq int = convert(int, SESSION_CONTEXT(N'uuid.sequence'))
+	declare @prev_ts bigint = convert(bigint, SESSION_CONTEXT(N'uuidv7.prev_ts'))
+	declare @calc_ts bigint = convert(bigint, SESSION_CONTEXT(N'uuidv7.calc_ts'))
+	declare @seq int = convert(int, SESSION_CONTEXT(N'uuidv7.sequence'))
 
 	declare @set_sequence bit = 0
-	if (@now_unix_ms = @prev_unix_ms)
+	if (@now_ts < @prev_ts)
+		set @calc_ts = @now_ts -- clock going back (do not try to handle)
+	else if (@now_ts <= @calc_ts)
 	begin
 		set @seq += 1
-		if (@seq > 4095)
-			set @future_ms += 1
+		if (@seq > 8191)
+			set @calc_ts += 1
 		else
 			set @set_sequence = 1
 	end
-	else if (@now_unix_ms < @prev_unix_ms)
-		set @future_ms = 0
-	else if (@now_unix_ms > @prev_unix_ms)
-	begin
-		set @future_ms = @prev_unix_ms + @future_ms - @now_unix_ms
-		if (@future_ms < 0) set @future_ms = 0
-	end
+	else
+		set @calc_ts = @now_ts
 
 	declare @bytes_6 binary = SUBSTRING(@rand, 7, 1)
 	declare @bytes_7 binary = SUBSTRING(@rand, 8, 1)
@@ -156,18 +151,18 @@ BEGIN
 
 	if (@set_sequence = 1)
 	begin
-		if (@seq < 0 or @seq > 4095) set @seq = 42 / 0 -- generate div by zero
-		set @bytes_8 = (@bytes_8 & 192) | ((@seq / 64) & 63)
-		set @bytes_9 = (@bytes_9 & 3) | ((@seq * 4) & 252)
+		if (@seq < 0 or @seq > 8191) set @seq = 42 / 0 -- generate div by zero
+		set @bytes_8 = (@bytes_8 & 192) | ((@seq / 128) & 63)
+		set @bytes_9 = (@bytes_9 & 1) | ((@seq * 2) & 254)
 	end
 	else
-		set @seq = ((@bytes_8 & 63) * 64) | ((@bytes_9 & 252) / 4)
+		set @seq = ((@bytes_8 & 63) * 128) | ((@bytes_9 & 254) / 2)
 
-	EXEC sp_set_session_context 'uuid.unix_ms', @now_unix_ms;  
-	EXEC sp_set_session_context 'uuid.future_ms', @future_ms;
-	EXEC sp_set_session_context 'uuid.sequence', @seq;
+	EXEC sp_set_session_context 'uuidv7.prev_ts', @now_ts;  
+	EXEC sp_set_session_context 'uuidv7.calc_ts', @calc_ts;
+	EXEC sp_set_session_context 'uuidv7.sequence', @seq;
 
-	declare @time binary(6) = cast((@now_unix_ms + @future_ms) as binary(6))
+	declare @time binary(6) = cast(@calc_ts as binary(6))
 	declare @uuid binary(16) = SUBSTRING(@rand, 1, 6) + @bytes_6 + @bytes_7 + @bytes_8 + @bytes_9 + @time
 	return @uuid
 END
@@ -263,9 +258,9 @@ select case when dbo.uuid_v8mssql_from_v7(dbo.uuid_v7_from_v8mssql('dc0c0c07-398
 select case when dbo.uuid_v7_from_v8mssql('dc0c0c07-398f-848c-b30d-017f22e279b0') = '017F22E2-79B0-7CC3-98C4-DC0C0C07398F' then 'pass' else 'fail' end
 select case when dbo.uuid_v8mssql_from_v7('017F22E2-79B0-7CC3-98C4-DC0C0C07398F') = 'dc0c0c07-398f-848c-b30d-017f22e279b0' then 'pass' else 'fail' end
 
-EXEC sp_set_session_context 'uuid.unix_ms', NULL  
-EXEC sp_set_session_context 'uuid.future_ms', NULL
-EXEC sp_set_session_context 'uuid.sequence', NULL
+EXEC sp_set_session_context 'uuidv7.prev_ts', NULL  
+EXEC sp_set_session_context 'uuidv7.calc_ts', NULL
+EXEC sp_set_session_context 'uuidv7.sequence', NULL
 
 IF OBJECT_ID('UuidFragTest') IS NOT NULL drop table UuidFragTest
 GO
@@ -319,7 +314,7 @@ end
 -- check frag
 select * from sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL, NULL, NULL)
 where object_id = object_id('UuidAsStringFragTest')
--- dbo.uuid_v7(): 35-43%
+-- dbo.uuid_v7(): 20-40%
 -- dbo.uuid_v8mssql(): 99%
 -- newid(): 98%
 -- dbo.uuid_v7() is better than newid(), but not great. Ulid produces proper lexical order: https://github.com/rmalayter/ulid-mssql/tree/master
@@ -353,3 +348,19 @@ where object_id = object_id('UuidAsArrayFragTest')
 -- newid(): 99%
 -- dbo.uuid_v8mssql(): 99%
 -- dbo.uuid_v8mssql_array(): 99%
+
+
+select case when count(*) = 0 then 'pass' else 'fail' end from (
+select ROW_NUMBER() over (order by Id asc) as rnum,* from UuidFragTest
+) x where x.row_num <> x.rnum
+-- 0
+
+select case when count(*) > 0 then 'pass' else 'fail' end from (
+select ROW_NUMBER() over (order by Id asc) as rnum,* from UuidAsStringFragTest
+) x where x.row_num <> x.rnum
+-- many
+
+select case when count(*) = 0 then 'pass' else 'fail' end from (
+select ROW_NUMBER() over (order by Id asc) as rnum,* from UuidAsArrayFragTest
+) x where x.row_num <> x.rnum
+-- 0

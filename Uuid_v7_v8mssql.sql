@@ -43,7 +43,7 @@ AS
 BEGIN
 	declare @rand binary(10)
 	declare @utc_now datetime2
-	select @utc_now = utc_now, @rand = rand_10 from uuid_v7_data
+	select @utc_now = utc_now, @rand = rand_10 from dbo.uuid_v7_data
 	declare @now_ts bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
 	declare @prev_ts bigint = convert(bigint, SESSION_CONTEXT(N'uuidv7.prev_ts'))
@@ -118,7 +118,7 @@ AS
 BEGIN
 	declare @rand binary(10)
 	declare @utc_now datetime2
-	select @utc_now = utc_now, @rand = rand_10 from uuid_v7_data
+	select @utc_now = utc_now, @rand = rand_10 from dbo.uuid_v7_data
 	declare @now_ts bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
 	declare @prev_ts bigint = convert(bigint, SESSION_CONTEXT(N'uuidv7.prev_ts'))

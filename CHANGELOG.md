@@ -1,3 +1,6 @@
+## 0.0.6
+* Since it is difficult to choose correct number of counter bits: change to dynamic/variable counter: 12-18bits
+
 ## 0.0.5
 * Changed my mind on several things:
 * Remove rollover guard

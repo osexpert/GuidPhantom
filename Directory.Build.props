@@ -21,7 +21,7 @@
     <Company>osexpert</Company>      
     <PackageReleaseNotes>See https://github.com/osexpert/GuidPhantom/blob/master/CHANGELOG.md for details</PackageReleaseNotes>
     
-    <VersionPrefix>0.0.5</VersionPrefix>
+    <VersionPrefix>0.0.6</VersionPrefix>
     <PackageTags>guid uuid</PackageTags>
     <Description>Yet another Guid library:-) Create Guid v1,v3,v5,v6,v7,v8MsSql,v8SHA256,v8SHA512,NEWSEQUENTIALID,XorGuid,NumericGuid,IncrementedGuid. Convert between v1 and v6. Convert between v7 and v8MsSql. Get Guid info.</Description>        
 		        

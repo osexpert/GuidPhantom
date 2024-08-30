@@ -32,7 +32,7 @@ SELECT
 	CRYPT_GEN_RANDOM(10) AS rand_10
 GO
 
--- uuid v7: time + 13bit random / counter + random
+-- uuid v7: time + counter + random
 -- Not ordered in ms sql server if stored as uniqueidentifier.
 -- Based on https://github.com/osexpert/GuidPhantom/blob/main/GuidPhantom/GuidKit.cs
 -- Returns big endian array

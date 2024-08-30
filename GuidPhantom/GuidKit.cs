@@ -324,17 +324,15 @@ namespace GuidPhantom
 
 		const int _counter_bits_start = 12;
 		const int _counter_bits_end = 18;
-		const int _counter_bits_max = 18;
-	//	static readonly int _seq_absolute_max = (int)Math.Pow(2, _counter_bits_max) - 1;
 
-		static int _counter_bits = _counter_bits_start;
+		const int _physical_counter_bits = 18;
 
-		//static int _counter_increment;
+		static int _current_counter_bits = _counter_bits_start;
 
 		/// <summary>
 		/// max (inclusive)
 		/// </summary>
-		static int _seq_max = (1 << _counter_bits_max) - 1;
+		static int _seq_max = (1 << _physical_counter_bits) - 1;
 
 		static object _lock = new();
 
@@ -346,8 +344,11 @@ namespace GuidPhantom
 		/// <summary>
 		/// Dirty/ulocked read of _counter_bits
 		/// </summary>
-		internal static int CounterBits => _counter_bits;
+		internal static int CounterBits => _current_counter_bits;
 
+		/// <summary>
+		/// Dirty/ulocked read of _seq_max
+		/// </summary>
 		internal static int SeqMax => _seq_max;
 
 		private static Guid CreateVersion7Or8MsSql(DateTimeOffset timestamp, byte version)
@@ -362,24 +363,18 @@ namespace GuidPhantom
 				if (now_ts < _prev_ts) // clock going back (do not try to handle)
 				{
 					_calc_ts = now_ts;
-					_counter_bits = _counter_bits_start;
-				//	CalcCounter();
+					_current_counter_bits = _counter_bits_start;
 				}
 				else if (now_ts <= _calc_ts)
 				{
-					_sequence += (1 << (_counter_bits_max - _counter_bits));
+					_sequence += (1 << (_physical_counter_bits - _current_counter_bits));
 					if (_sequence > _seq_max)
 					{
 						_calc_ts++;
-						// it is possible we rollover sequence even if we have infinite bits...we don't know when the sequence started.
-						// but it we start going into the future, as a trend, we probably need more bits
-						// the trend: we are more than 2 ms into the future
-						if ((_calc_ts - now_ts) > 10)
-						{
-							_counter_bits += 1;
-							if (_counter_bits > _counter_bits_end)
-								_counter_bits = _counter_bits_end;
-						}
+
+						_current_counter_bits += 1;
+						if (_current_counter_bits > _counter_bits_end)
+							_current_counter_bits = _counter_bits_end;
 					}
 					else
 						setSequence = true;
@@ -387,8 +382,7 @@ namespace GuidPhantom
 				else 
 				{
 					_calc_ts = now_ts;
-					if (now_ts > _prev_ts + 1) // keep counter bits if living on the edge (now_ts = _prev_ts + 1)
-						_counter_bits = _counter_bits_start;
+					_current_counter_bits = _counter_bits_start;
 				}
 				_prev_ts = now_ts;
 

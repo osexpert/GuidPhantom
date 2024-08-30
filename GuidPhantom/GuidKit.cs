@@ -351,8 +351,6 @@ namespace GuidPhantom
 		/// </summary>
 		internal static int SeqMax => _seq_max;
 
-		//static bool? _inc_bit;
-
 		private static Guid CreateVersion7Or8MsSql(DateTimeOffset timestamp, byte version)
 		{
 			var bytes = Guid.NewGuid().ToByteArray(bigEndian: true);
@@ -365,38 +363,23 @@ namespace GuidPhantom
 				if (now_ts < _prev_ts) // clock going back (do not try to handle)
 				{
 					_calc_ts = now_ts;
-//					_inc_bit = null;
 					_current_counter_bits = _counter_bits_start;
 				}
 				else if (now_ts <= _calc_ts) // _calc_ts is now or in the future
 				{
-					//if (_inc_bit == null)
-					//{
-					//	// ignore the last 10%
-					//	_inc_bit = _sequence < (_seq_max / 10) * 9;
-					//}
-
-					// find out if before or after the half
-
 					_sequence += (1 << (_physical_counter_bits - _current_counter_bits));
 					if (_sequence > _seq_max)
 					{
-					//	if (_inc_bit is true)
-						{
-							_current_counter_bits += 1;
-							if (_current_counter_bits > _counter_bits_end)
-								_current_counter_bits = _counter_bits_end;
-						}
-
 						_calc_ts++;
-//						_inc_bit = null;
+						_current_counter_bits += 1;
+						if (_current_counter_bits > _counter_bits_end)
+							_current_counter_bits = _counter_bits_end;
 					}
 					else
 						setSequence = true;
 				}
 				else // _calc_ts is in the past
 				{
-//					_inc_bit = null;
 					_calc_ts = now_ts;
 					if (now_ts == _prev_ts + 1) // calm down
 					{

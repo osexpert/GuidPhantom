@@ -351,10 +351,10 @@ namespace GuidPhantom.Tests
 
 #if NET6_0_OR_GREATER
 				long ts = Random.Shared.NextInt64();
-				int seq = Random.Shared.Next(8191 + 1);
+				int seq = Random.Shared.Next(GuidKit.SeqMax + 1);
 #else
 				long ts = _rand.Next();
-				int seq = _rand.Next(8191 + 1);
+				int seq = _rand.Next(GuidKit.SeqMax + 1);
 #endif
 
 				var bytesOrg = Guid.NewGuid().ToByteArray(bigEndian: true);

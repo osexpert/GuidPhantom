@@ -56,7 +56,7 @@ BEGIN
 	else if (@now_ts <= @calc_ts)
 	begin
 		set @seq += 1
-		if (@seq > 8191)
+		if (@seq > 4095)
 			set @calc_ts += 1
 		else
 			set @set_sequence = 1
@@ -76,13 +76,12 @@ BEGIN
 
 	if (@set_sequence = 1)
 	begin
-		if (@seq < 0 or @seq > 8191) set @seq = 42 / 0 -- generate div by zero
-		set @bytes_6 = (@bytes_6 & 240) | ((@seq / 512) & 15)
-		set @bytes_7 = @seq / 2
-		set @bytes_8 = (@bytes_8 & 223) | ((@seq * 32) & 32)
+		if (@seq < 0 or @seq > 4095) set @seq = 42 / 0 -- generate div by zero
+		set @bytes_6 = (@bytes_6 & 240) | ((@seq / 256) & 15)
+		set @bytes_7 = @seq
 	end
 	else
-		set @seq = ((@bytes_6 & 15) * 512) | (@bytes_7 * 2) | ((@bytes_8 & 32) / 32)
+		set @seq = ((@bytes_6 & 15) * 256) | @bytes_7
 
 	EXEC sp_set_session_context 'uuidv7.prev_ts', @now_ts;  
 	EXEC sp_set_session_context 'uuidv7.calc_ts', @calc_ts;
@@ -131,7 +130,7 @@ BEGIN
 	else if (@now_ts <= @calc_ts)
 	begin
 		set @seq += 1
-		if (@seq > 8191)
+		if (@seq > 4095)
 			set @calc_ts += 1
 		else
 			set @set_sequence = 1
@@ -151,12 +150,12 @@ BEGIN
 
 	if (@set_sequence = 1)
 	begin
-		if (@seq < 0 or @seq > 8191) set @seq = 42 / 0 -- generate div by zero
-		set @bytes_8 = (@bytes_8 & 192) | ((@seq / 128) & 63)
-		set @bytes_9 = (@bytes_9 & 1) | ((@seq * 2) & 254)
+		if (@seq < 0 or @seq > 4095) set @seq = 42 / 0 -- generate div by zero
+		set @bytes_8 = (@bytes_8 & 192) | ((@seq / 64) & 63)
+		set @bytes_9 = (@bytes_9 & 3) | ((@seq * 4) & 252)
 	end
 	else
-		set @seq = ((@bytes_8 & 63) * 128) | ((@bytes_9 & 254) / 2)
+		set @seq = ((@bytes_8 & 63) * 64) | ((@bytes_9 & 252) / 4)
 
 	EXEC sp_set_session_context 'uuidv7.prev_ts', @now_ts;  
 	EXEC sp_set_session_context 'uuidv7.calc_ts', @calc_ts;

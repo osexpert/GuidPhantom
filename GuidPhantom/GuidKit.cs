@@ -321,12 +321,34 @@ namespace GuidPhantom
 		static long? _prev_ts = null;
 		static long? _calc_ts = null;
 		static int _sequence = 0;
+
+		const int _counter_bits_start = 12;
+		const int _counter_bits_end = 18;
+		const int _counter_bits_max = 18;
+	//	static readonly int _seq_absolute_max = (int)Math.Pow(2, _counter_bits_max) - 1;
+
+		static int _counter_bits = _counter_bits_start;
+
+		//static int _counter_increment;
+
+		/// <summary>
+		/// max (inclusive)
+		/// </summary>
+		static int _seq_max = (1 << _counter_bits_max) - 1;
+
 		static object _lock = new();
 
 		/// <summary>
 		/// Dirty/ulocked read of how far the calculated timestamp is into the future. Only for testing.
 		/// </summary>
 		internal static long? Future => _calc_ts - _prev_ts;
+
+		/// <summary>
+		/// Dirty/ulocked read of _counter_bits
+		/// </summary>
+		internal static int CounterBits => _counter_bits;
+
+		internal static int SeqMax => _seq_max;
 
 		private static Guid CreateVersion7Or8MsSql(DateTimeOffset timestamp, byte version)
 		{
@@ -337,34 +359,50 @@ namespace GuidPhantom
 			lock (_lock)
 			{
 				bool setSequence = false;
-				if (now_ts < _prev_ts)
+				if (now_ts < _prev_ts) // clock going back (do not try to handle)
 				{
-					_calc_ts = now_ts; // clock going back (do not try to handle)
+					_calc_ts = now_ts;
+					_counter_bits = _counter_bits_start;
+				//	CalcCounter();
 				}
 				else if (now_ts <= _calc_ts)
 				{
-					_sequence++;
-					if (_sequence > 8191)
+					_sequence += (1 << (_counter_bits_max - _counter_bits));
+					if (_sequence > _seq_max)
+					{
 						_calc_ts++;
+						// it is possible we rollover sequence even if we have infinite bits...we don't know when the sequence started.
+						// but it we start going into the future, as a trend, we probably need more bits
+						// the trend: we are more than 2 ms into the future
+						if ((_calc_ts - now_ts) > 10)
+						{
+							_counter_bits += 1;
+							if (_counter_bits > _counter_bits_end)
+								_counter_bits = _counter_bits_end;
+						}
+					}
 					else
 						setSequence = true;
 				}
-				else
+				else 
 				{
 					_calc_ts = now_ts;
+					if (now_ts > _prev_ts + 1) // keep counter bits if living on the edge (now_ts = _prev_ts + 1)
+						_counter_bits = _counter_bits_start;
 				}
 				_prev_ts = now_ts;
 
 				if (version == 7)
-					CreateVersion7(bytes, _calc_ts.Value, ref _sequence, setSequence);
+					CreateVersion7(bytes, _calc_ts!.Value, ref _sequence, setSequence);
 				else if (version == 8)
-					CreateVersion8MsSql(bytes, _calc_ts.Value, ref _sequence, setSequence);
+					CreateVersion8MsSql(bytes, _calc_ts!.Value, ref _sequence, setSequence);
 				else
 					throw new InvalidOperationException("Not version 7 or 8");
 			}
 
 			return FromByteArray(bytes, bigEndian: true);
 		}
+
 
 		/// <summary>
 		/// SHA256 hash of namespace and name
@@ -417,18 +455,18 @@ namespace GuidPhantom
 			// sequence
 			if (setSequence)
 			{
-				if (sequence < 0 || sequence > 8191)
-					throw new ArgumentException("Sequence must be between 0 and 8191");
+				if (sequence < 0 || sequence > _seq_max)
+					throw new ArgumentException($"Sequence must be between 0 and {_seq_max}");
 
-				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (sequence >> (1 + 8)) & 0b0000_1111);
-				bytes[7] = (byte)(sequence >> 1);
-				bytes[8] = (byte)((bytes[8] & 0b1101_1111) | (sequence << 5) & 0b0010_0000);
+				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (sequence >> (6 + 8)) & 0b0000_1111);
+				bytes[7] = (byte)(sequence >> 6);
+				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence) & 0b0011_1111);
 			}
 			else
 			{
-				sequence = (bytes[6] & 0b0000_1111) << (1 + 8) |
-					(bytes[7] << 1) |
-					(bytes[8] & 0b0010_0000) >> 5;
+				sequence = (bytes[6] & 0b0000_1111) << (6 + 8) |
+					(bytes[7] << 6) |
+					(bytes[8] & 0b0011_1111);
 			}
 		}
 
@@ -464,16 +502,19 @@ namespace GuidPhantom
 			// sequence
 			if (setSequence)
 			{
-				if (sequence < 0 || sequence > 8191)
-					throw new ArgumentException("Sequence must be between 0 and 8191");
+				if (sequence < 0 || sequence > _seq_max)
+					throw new ArgumentException($"Sequence must be between 0 and {_seq_max}");
 
-				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> 7) & 0b0011_1111);
-				bytes[9] = (byte)((bytes[9] & 0b0000_0001) | (sequence << 1) & 0b1111_1110);
+				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> (4 + 8) & 0b0011_1111));
+				bytes[9] = (byte)(sequence >> 4);
+				bytes[7] = (byte)((bytes[7] & 0b0000_1111) | (sequence << 4) & 0b1111_0000);
 			}
 			else
 			{
-				sequence = (bytes[8] & 0b0011_1111) << 7 |
-					(bytes[9] & 0b1111_1110) >> 1;
+				sequence = (bytes[8] & 0b0011_1111) << (4 + 8) |
+					bytes[9] << 4 |
+					(bytes[7] & 0b1111_0000) >> 4
+					;
 			}
 		}
 

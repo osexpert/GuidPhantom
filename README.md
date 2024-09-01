@@ -53,9 +53,9 @@ It is possible to use Version 7 stored as a binary(16) for proper ordering, if s
 or send Guid/uniqueidentifier from the client and convert to byte array in sql, then need to use eg. dbo.uuid_swap_endian(...), to make it big endian.
 
 References:
-https://zendesk.engineering/how-probable-are-collisions-with-ulids-monotonic-option-d604d3ed2de
-https://github.com/mareek/UUIDNext
-https://github.com/LiosK/uuidv7
-https://math.stackexchange.com/questions/4697032/threshold-for-the-number-of-uuids-generated-per-millisecond-at-which-the-colli
-https://github.com/uuid6/uuid6-ietf-draft/issues/60
+* https://zendesk.engineering/how-probable-are-collisions-with-ulids-monotonic-option-d604d3ed2de
+* https://github.com/mareek/UUIDNext
+* https://github.com/LiosK/uuidv7
+* https://math.stackexchange.com/questions/4697032/threshold-for-the-number-of-uuids-generated-per-millisecond-at-which-the-colli
+* https://github.com/uuid6/uuid6-ietf-draft/issues/60
 

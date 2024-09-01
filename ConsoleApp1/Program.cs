@@ -11,11 +11,11 @@ namespace ConsoleApp1
     {
         public static void Main()
         {
-			//while (true)
-			//{
-			//	var v777 = GuidKit.CreateVersion7();
-			//	Console.WriteLine("" + v777 + ", " + GuidKit.CounterBits);
-			//}
+			while (true)
+			{
+				var v777 = GuidKit.CreateVersion7();
+				Console.WriteLine("" + v777 + ", " + GuidKit.CounterBits + " fut:" + GuidKit.Future);
+			}
 
 			//long i2 = 0;
 			//long collnum = 0;
@@ -27,7 +27,7 @@ namespace ConsoleApp1
 			//	if (!hs.Add(r))
 			//	{
 			//		// coll
-					
+
 			//		collnum++;
 			//		Console.WriteLine("collnum: " + collnum + " tot:"+i2+" rat " + i2/ collnum);
 			//	}

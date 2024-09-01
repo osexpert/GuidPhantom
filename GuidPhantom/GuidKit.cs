@@ -7,7 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 
 [assembly: InternalsVisibleTo("GuidPhantom.Tests")]
-[assembly: InternalsVisibleTo("ConsoleApp1")]
+//[assembly: InternalsVisibleTo("ConsoleApp1")]
 
 namespace GuidPhantom
 {
@@ -320,7 +320,7 @@ namespace GuidPhantom
 
 		static long? _prev_ts = null;
 		static long? _calc_ts = null;
-		static int _sequence = 0;
+		static int _counter = 0;
 
 		const byte _counter_bits_start = 4; // can even be 0
 		const byte _counter_bits_end = 18; // can be less than _physical_counter_bits, but not more:-)
@@ -332,24 +332,24 @@ namespace GuidPhantom
 		/// <summary>
 		/// max (inclusive)
 		/// </summary>
-		static int _seq_max = (1 << _physical_counter_bits) - 1;
+		static int _counter_max = (1 << _physical_counter_bits) - 1;
 
 		static object _lock = new();
 
 		/// <summary>
 		/// Dirty/ulocked read of how far the calculated timestamp is into the future. Only for testing.
 		/// </summary>
-		internal static long? Future => _calc_ts - _prev_ts;
+		public static long? Future => _calc_ts - _prev_ts;
 
 		/// <summary>
 		/// Dirty/ulocked read of _counter_bits
 		/// </summary>
-		internal static int CounterBits => _current_counter_bits;
+		public static int CounterBits => _current_counter_bits;
 
 		/// <summary>
 		/// Dirty/ulocked read of _seq_max
 		/// </summary>
-		internal static int SeqMax => _seq_max;
+		public static int CounterMax => _counter_max;
 
 		private static Guid CreateVersion7Or8MsSql(DateTimeOffset timestamp, byte version)
 		{
@@ -359,7 +359,7 @@ namespace GuidPhantom
 
 			lock (_lock)
 			{
-				bool setSequence = false;
+				bool setCounter = false;
 				if (now_ts < _prev_ts) // clock going back (do not try to handle)
 				{
 					_calc_ts = now_ts;
@@ -367,8 +367,8 @@ namespace GuidPhantom
 				}
 				else if (now_ts <= _calc_ts) // _calc_ts is now or in the future
 				{
-					_sequence += (1 << (_physical_counter_bits - _current_counter_bits));
-					if (_sequence > _seq_max)
+					_counter += (1 << (_physical_counter_bits - _current_counter_bits));
+					if (_counter > _counter_max)
 					{
 						_calc_ts++;
 						_current_counter_bits += 1;
@@ -376,7 +376,7 @@ namespace GuidPhantom
 							_current_counter_bits = _counter_bits_end;
 					}
 					else
-						setSequence = true;
+						setCounter = true;
 				}
 				else // _calc_ts is in the past
 				{
@@ -395,9 +395,9 @@ namespace GuidPhantom
 				_prev_ts = now_ts;
 
 				if (version == 7)
-					CreateVersion7(bytes, _calc_ts!.Value, ref _sequence, setSequence, _current_counter_bits);
+					CreateVersion7(bytes, _calc_ts!.Value, ref _counter, setCounter, _current_counter_bits);
 				else if (version == 8)
-					CreateVersion8MsSql(bytes, _calc_ts!.Value, ref _sequence, setSequence, _current_counter_bits);
+					CreateVersion8MsSql(bytes, _calc_ts!.Value, ref _counter, setCounter, _current_counter_bits);
 				else
 					throw new InvalidOperationException("Not version 7 or 8");
 			}
@@ -434,7 +434,7 @@ namespace GuidPhantom
 		/// <returns>Version8MsSql Guid</returns>
 		public static Guid CreateVersion8MsSql() => CreateVersion7Or8MsSql(DateTimeOffset.UtcNow, 8);
 
-		internal static void CreateVersion7(byte[] bytes, long unix_ts_ms, ref int sequence, bool setSequence, byte setBits)
+		internal static void CreateVersion7(byte[] bytes, long unix_ts_ms, ref int counter, bool setCounter, byte setBits)
 		{
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
@@ -454,26 +454,25 @@ namespace GuidPhantom
 			const byte newVer = 7;
 			bytes[6] = (byte)((newVer << 4) | (bytes[6] & 0b0000_1111));
 
-			var ex_seq = (bytes[6] & 0b0000_1111) << (6 + 8) |
+			var ex_counter = (bytes[6] & 0b0000_1111) << (6 + 8) |
 					(bytes[7] << 6) |
 					(bytes[8] & 0b0011_1111);
 
-			// sequence
-			if (setSequence)
+			if (setCounter)
 			{
-				if (sequence < 0 || sequence > _seq_max)
-					throw new ArgumentException($"Sequence must be between 0 and {_seq_max}");
+				if (counter < 0 || counter > _counter_max)
+					throw new ArgumentException($"Counter must be between 0 and {_counter_max}");
 
 				var keep_mask = (1 << (_physical_counter_bits - setBits)) - 1;
-				var new_seq = sequence & ~keep_mask | ex_seq & keep_mask;
+				var new_counter = counter & ~keep_mask | ex_counter & keep_mask;
 
-				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (new_seq >> (6 + 8)) & 0b0000_1111);
-				bytes[7] = (byte)(new_seq >> 6);
-				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (new_seq) & 0b0011_1111);
+				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (new_counter >> (6 + 8)) & 0b0000_1111);
+				bytes[7] = (byte)(new_counter >> 6);
+				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (new_counter) & 0b0011_1111);
 			}
 			else
 			{
-				sequence = ex_seq;
+				counter = ex_counter;
 			}
 		}
 
@@ -486,7 +485,7 @@ namespace GuidPhantom
 		/// </summary>
 		/// <param name="unix_ts_ms"></param>
 		/// <returns>Version8MsSql Guid</returns>
-		internal static void CreateVersion8MsSql(byte[] bytes, long unix_ts_ms, ref int sequence, bool setSequence, byte setBits)
+		internal static void CreateVersion8MsSql(byte[] bytes, long unix_ts_ms, ref int counter, bool setCounter, byte setBits)
 		{
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
@@ -506,26 +505,25 @@ namespace GuidPhantom
 			const byte newVer = 8;
 			bytes[6] = (byte)((newVer << 4) | (bytes[6] & 0b0000_1111));
 
-			var ex_seq = (bytes[8] & 0b0011_1111) << (4 + 8) |
+			var ex_counter = (bytes[8] & 0b0011_1111) << (4 + 8) |
 					bytes[9] << 4 |
 					(bytes[7] & 0b1111_0000) >> 4;
 
-			// sequence
-			if (setSequence)
+			if (setCounter)
 			{
-				if (sequence < 0 || sequence > _seq_max)
-					throw new ArgumentException($"Sequence must be between 0 and {_seq_max}");
+				if (counter < 0 || counter > _counter_max)
+					throw new ArgumentException($"Counter must be between 0 and {_counter_max}");
 
 				var keep_mask = (1 << (_physical_counter_bits - setBits)) - 1;
-				var new_seq = sequence & ~keep_mask | ex_seq & keep_mask;
+				var new_counter = counter & ~keep_mask | ex_counter & keep_mask;
 
-				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (new_seq >> (4 + 8) & 0b0011_1111));
-				bytes[9] = (byte)(new_seq >> 4);
-				bytes[7] = (byte)((bytes[7] & 0b0000_1111) | (new_seq << 4) & 0b1111_0000);
+				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (new_counter >> (4 + 8) & 0b0011_1111));
+				bytes[9] = (byte)(new_counter >> 4);
+				bytes[7] = (byte)((bytes[7] & 0b0000_1111) | (new_counter << 4) & 0b1111_0000);
 			}
 			else
 			{
-				sequence = ex_seq;
+				counter = ex_counter;
 			}
 		}
 

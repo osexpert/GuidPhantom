@@ -322,12 +322,12 @@ namespace GuidPhantom
 		static long? _calc_ts = null;
 		static int _sequence = 0;
 
-		const int _counter_bits_start = 12; // can even be 0
-		const int _counter_bits_end = 18; // can be less than _physical_counter_bits, but not more:-)
+		const byte _counter_bits_start = 4; // can even be 0
+		const byte _counter_bits_end = 18; // can be less than _physical_counter_bits, but not more:-)
 
-		const int _physical_counter_bits = 18;
+		const byte _physical_counter_bits = 18;
 
-		static int _current_counter_bits = _counter_bits_start;
+		static byte _current_counter_bits = _counter_bits_start;
 
 		/// <summary>
 		/// max (inclusive)
@@ -395,9 +395,9 @@ namespace GuidPhantom
 				_prev_ts = now_ts;
 
 				if (version == 7)
-					CreateVersion7(bytes, _calc_ts!.Value, ref _sequence, setSequence);
+					CreateVersion7(bytes, _calc_ts!.Value, ref _sequence, setSequence, _current_counter_bits);
 				else if (version == 8)
-					CreateVersion8MsSql(bytes, _calc_ts!.Value, ref _sequence, setSequence);
+					CreateVersion8MsSql(bytes, _calc_ts!.Value, ref _sequence, setSequence, _current_counter_bits);
 				else
 					throw new InvalidOperationException("Not version 7 or 8");
 			}
@@ -434,7 +434,7 @@ namespace GuidPhantom
 		/// <returns>Version8MsSql Guid</returns>
 		public static Guid CreateVersion8MsSql() => CreateVersion7Or8MsSql(DateTimeOffset.UtcNow, 8);
 
-		internal static void CreateVersion7(byte[] bytes, long unix_ts_ms, ref int sequence, bool setSequence)
+		internal static void CreateVersion7(byte[] bytes, long unix_ts_ms, ref int sequence, bool setSequence, byte setBits)
 		{
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
@@ -454,21 +454,26 @@ namespace GuidPhantom
 			const byte newVer = 7;
 			bytes[6] = (byte)((newVer << 4) | (bytes[6] & 0b0000_1111));
 
+			var ex_seq = (bytes[6] & 0b0000_1111) << (6 + 8) |
+					(bytes[7] << 6) |
+					(bytes[8] & 0b0011_1111);
+
 			// sequence
 			if (setSequence)
 			{
 				if (sequence < 0 || sequence > _seq_max)
 					throw new ArgumentException($"Sequence must be between 0 and {_seq_max}");
 
-				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (sequence >> (6 + 8)) & 0b0000_1111);
-				bytes[7] = (byte)(sequence >> 6);
-				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence) & 0b0011_1111);
+				var keep_mask = (1 << (_physical_counter_bits - setBits)) - 1;
+				var new_seq = sequence & ~keep_mask | ex_seq & keep_mask;
+
+				bytes[6] = (byte)((bytes[6] & 0b1111_0000) | (new_seq >> (6 + 8)) & 0b0000_1111);
+				bytes[7] = (byte)(new_seq >> 6);
+				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (new_seq) & 0b0011_1111);
 			}
 			else
 			{
-				sequence = (bytes[6] & 0b0000_1111) << (6 + 8) |
-					(bytes[7] << 6) |
-					(bytes[8] & 0b0011_1111);
+				sequence = ex_seq;
 			}
 		}
 
@@ -481,7 +486,7 @@ namespace GuidPhantom
 		/// </summary>
 		/// <param name="unix_ts_ms"></param>
 		/// <returns>Version8MsSql Guid</returns>
-		internal static void CreateVersion8MsSql(byte[] bytes, long unix_ts_ms, ref int sequence, bool setSequence)
+		internal static void CreateVersion8MsSql(byte[] bytes, long unix_ts_ms, ref int sequence, bool setSequence, byte setBits)
 		{
 			if (unix_ts_ms < 0)
 				throw new ArgumentOutOfRangeException(nameof(unix_ts_ms));
@@ -501,22 +506,26 @@ namespace GuidPhantom
 			const byte newVer = 8;
 			bytes[6] = (byte)((newVer << 4) | (bytes[6] & 0b0000_1111));
 
+			var ex_seq = (bytes[8] & 0b0011_1111) << (4 + 8) |
+					bytes[9] << 4 |
+					(bytes[7] & 0b1111_0000) >> 4;
+
 			// sequence
 			if (setSequence)
 			{
 				if (sequence < 0 || sequence > _seq_max)
 					throw new ArgumentException($"Sequence must be between 0 and {_seq_max}");
 
-				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (sequence >> (4 + 8) & 0b0011_1111));
-				bytes[9] = (byte)(sequence >> 4);
-				bytes[7] = (byte)((bytes[7] & 0b0000_1111) | (sequence << 4) & 0b1111_0000);
+				var keep_mask = (1 << (_physical_counter_bits - setBits)) - 1;
+				var new_seq = sequence & ~keep_mask | ex_seq & keep_mask;
+
+				bytes[8] = (byte)((bytes[8] & 0b1100_0000) | (new_seq >> (4 + 8) & 0b0011_1111));
+				bytes[9] = (byte)(new_seq >> 4);
+				bytes[7] = (byte)((bytes[7] & 0b0000_1111) | (new_seq << 4) & 0b1111_0000);
 			}
 			else
 			{
-				sequence = (bytes[8] & 0b0011_1111) << (4 + 8) |
-					bytes[9] << 4 |
-					(bytes[7] & 0b1111_0000) >> 4
-					;
+				sequence = ex_seq;
 			}
 		}
 

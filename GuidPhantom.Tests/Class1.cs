@@ -361,10 +361,10 @@ namespace GuidPhantom.Tests
 
 				var bytesCpy1 = CopyBytes(bytesOrg);
 				// get seq
-				GuidKit.CreateVersion8MsSql(bytesCpy1, ts, ref seq, false);
+				GuidKit.CreateVersion8MsSql(bytesCpy1, ts, ref seq, false, 12);
 				// set seq		
 				var bytesCpy2 = CopyBytes(bytesOrg);
-				GuidKit.CreateVersion8MsSql(bytesCpy2, ts, ref seq, true);
+				GuidKit.CreateVersion8MsSql(bytesCpy2, ts, ref seq, true, 12);
 				// check bytes match
 				Assert.IsTrue(bytesCpy1.SequenceEqual(bytesCpy2));
 
@@ -373,17 +373,17 @@ namespace GuidPhantom.Tests
 				//var bytesv7 = Guid.NewGuid().ToByteArray(bigEndian: true);
 
 				var bytesCpy3 = CopyBytes(bytesOrg);
-				GuidKit.CreateVersion7(bytesCpy3, ts, ref seq, false);
+				GuidKit.CreateVersion7(bytesCpy3, ts, ref seq, false, 12);
 				var bytesCpy4 = CopyBytes(bytesOrg);
-				GuidKit.CreateVersion7(bytesCpy4, ts, ref seq, true);
+				GuidKit.CreateVersion7(bytesCpy4, ts, ref seq, true, 12);
 				Assert.IsTrue(bytesCpy3.SequenceEqual(bytesCpy4));
 
 
 				var bytesCpy5 = CopyBytes(bytesOrg);
 				var bytesCpy6 = CopyBytes(bytesOrg);
 
-				GuidKit.CreateVersion7(bytesCpy5, ts, ref seq, true);
-				GuidKit.CreateVersion8MsSql(bytesCpy6, ts, ref seq, true);
+				GuidKit.CreateVersion7(bytesCpy5, ts, ref seq, true, 12);
+				GuidKit.CreateVersion8MsSql(bytesCpy6, ts, ref seq, true, 12);
 
 				var v7 = GuidKit.FromByteArray(bytesCpy5, bigEndian: true);
 				var v8 = GuidKit.FromByteArray(bytesCpy6, bigEndian: true);

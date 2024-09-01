@@ -1,6 +1,8 @@
-﻿using System.Diagnostics;
+﻿using System.Data.SqlTypes;
+using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using GuidPhantom;
 
 namespace ConsoleApp1
@@ -9,11 +11,56 @@ namespace ConsoleApp1
     {
         public static void Main()
         {
+			//while (true)
+			//{
+			//	var v777 = GuidKit.CreateVersion7();
+			//	Console.WriteLine("" + v777 + ", " + GuidKit.CounterBits);
+			//}
+
+			//long i2 = 0;
+			//long collnum = 0;
+			//HashSet<int> hs = new();
+			//while (true)
+			//{
+			//	var r = RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
+
+			//	if (!hs.Add(r))
+			//	{
+			//		// coll
+					
+			//		collnum++;
+			//		Console.WriteLine("collnum: " + collnum + " tot:"+i2+" rat " + i2/ collnum);
+			//	}
+
+			//	i2++;
+
+			//	for (int c = 0; c < 10000; c++)
+			//	{
+			//		r += 1000;
+
+			//		i2 ++;
+
+			//		if (!hs.Add(r))
+			//		{
+			//			// coll
+
+			//			collnum++;
+			//			Console.WriteLine("collnum_2: " + collnum + " tot:" + i2 + " rat " + i2 / collnum);
+			//		}
+			//	}
+
+			//	if (i2 >= 100_000_000)
+			//	{
+			//		Console.WriteLine("wait");
+			//		Console.ReadLine();
+			//	}
+			//}
 
 			var s = Stopwatch.StartNew();
 			var n = DateTimeOffset.UtcNow;
 			Guid? last = null;
-			for (int i = 0; i <= 100_000_000; i++)
+			Guid? prev = null;
+			for (int i = 0;/* i <= 100_000_000*/; i++)
 			{
 				var v777 = GuidKit.CreateVersion7();
 				if ((i % 1_000_000) == 0)
@@ -21,6 +68,19 @@ namespace ConsoleApp1
 				//var v777 = Guid.NewGuid();
 				if (i == 100_000_000)//
 					last = v777;
+
+				if (prev != null && v777.CompareTo(prev.Value) <= 0)
+				{
+					throw new Exception(v777 + " is less or equal to " + prev.Value);
+				}
+
+				prev = v777;
+
+				//for (int x=0;x<1000;x++)
+				//{
+
+				//}
+
 			}
 			s.Stop();
 			Console.WriteLine("" + s.ElapsedMilliseconds + "ms");

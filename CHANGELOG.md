@@ -1,3 +1,8 @@
+## 0.0.7
+* Change dynamic/variable counter: 4-18bits
+* Add 'back off' logic: when on the 'edge', gradually reduce number of bits instead of going straight back to 4 bits.
+* FIX: Take the remaining lower bits from the Guid (random) instead of from the counter (constant). This increases randomness.
+
 ## 0.0.6
 * Since it is difficult to choose correct number of counter bits: change to dynamic/variable counter: 12-18bits
 

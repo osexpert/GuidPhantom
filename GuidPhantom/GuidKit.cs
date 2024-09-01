@@ -332,9 +332,9 @@ namespace GuidPhantom
 		/// <summary>
 		/// max (inclusive)
 		/// </summary>
-		static int _counter_max = (1 << _physical_counter_bits) - 1;
+		const int _counter_max = (1 << _physical_counter_bits) - 1;
 
-		static object _lock = new();
+		static readonly object _lock = new();
 
 		/// <summary>
 		/// Dirty/ulocked read of how far the calculated timestamp is into the future. Only for testing.

@@ -46,9 +46,11 @@ BEGIN
 	select @utc_now = utc_now, @rand = rand_10 from dbo.uuid_v7_data
 	declare @now_ts bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
-	declare @prev_ts bigint = convert(bigint, SESSION_CONTEXT(N'uuidv7.prev_ts'))
-	declare @calc_ts bigint = convert(bigint, SESSION_CONTEXT(N'uuidv7.calc_ts'))
-	declare @seq int = convert(int, SESSION_CONTEXT(N'uuidv7.sequence'))
+	declare @state binary(20) = convert(binary(20), SESSION_CONTEXT(N'uuidv7.state'))
+
+	declare @prev_ts bigint = substring(@state, 1, 8)
+	declare @calc_ts bigint = substring(@state, 9, 8)
+	declare @seq int = substring(@state, 17, 4)
 
 	declare @set_sequence bit = 0
 	if (@now_ts < @prev_ts)
@@ -83,15 +85,17 @@ BEGIN
 	else
 		set @seq = ((@bytes_6 & 15) * 256) | @bytes_7
 
-	EXEC sp_set_session_context 'uuidv7.prev_ts', @now_ts;  
-	EXEC sp_set_session_context 'uuidv7.calc_ts', @calc_ts;
-	EXEC sp_set_session_context 'uuidv7.sequence', @seq;
+	set @state = cast(@now_ts as binary(8)) + cast(@calc_ts as binary(8)) + cast(@seq as binary(4))
+	-- sp_set_session_context is very slow, so call it as little as possible. Of all the things happening here, this call uses 25% if the time!
+	EXEC sp_set_session_context 'uuidv7.state', @state;
 
 	declare @time binary(6) = cast(@calc_ts as binary(6))
 	declare @uuid binary(16) = @time + @bytes_6 + @bytes_7 + @bytes_8 + @bytes_9 + SUBSTRING(@rand, 5, 6)
 	return @uuid
 END
 GO
+
+
 
 -- Version 7 big endian array. Double swapping sucks, but optional function arguments sucks too (need to use 'default' for optional arguments)
 CREATE FUNCTION uuid_v7()
@@ -120,9 +124,11 @@ BEGIN
 	select @utc_now = utc_now, @rand = rand_10 from dbo.uuid_v7_data
 	declare @now_ts bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
-	declare @prev_ts bigint = convert(bigint, SESSION_CONTEXT(N'uuidv7.prev_ts'))
-	declare @calc_ts bigint = convert(bigint, SESSION_CONTEXT(N'uuidv7.calc_ts'))
-	declare @seq int = convert(int, SESSION_CONTEXT(N'uuidv7.sequence'))
+	declare @state binary(20) = convert(binary(20), SESSION_CONTEXT(N'uuidv7.state'))
+
+	declare @prev_ts bigint = substring(@state, 1, 8)
+	declare @calc_ts bigint = substring(@state, 9, 8)
+	declare @seq int = substring(@state, 17, 4)
 
 	declare @set_sequence bit = 0
 	if (@now_ts < @prev_ts)
@@ -157,9 +163,9 @@ BEGIN
 	else
 		set @seq = ((@bytes_8 & 63) * 64) | ((@bytes_9 & 252) / 4)
 
-	EXEC sp_set_session_context 'uuidv7.prev_ts', @now_ts;  
-	EXEC sp_set_session_context 'uuidv7.calc_ts', @calc_ts;
-	EXEC sp_set_session_context 'uuidv7.sequence', @seq;
+	set @state = cast(@now_ts as binary(8)) + cast(@calc_ts as binary(8)) + cast(@seq as binary(4))
+	-- sp_set_session_context is very slow, so call it as little as possible. Of all the things happening here, this call uses 25% if the time!
+	EXEC sp_set_session_context 'uuidv7.state', @state;
 
 	declare @time binary(6) = cast(@calc_ts as binary(6))
 	declare @uuid binary(16) = SUBSTRING(@rand, 1, 6) + @bytes_6 + @bytes_7 + @bytes_8 + @bytes_9 + @time
@@ -257,9 +263,7 @@ select case when dbo.uuid_v8mssql_from_v7(dbo.uuid_v7_from_v8mssql('dc0c0c07-398
 select case when dbo.uuid_v7_from_v8mssql('dc0c0c07-398f-848c-b30d-017f22e279b0') = '017F22E2-79B0-7CC3-98C4-DC0C0C07398F' then 'pass' else 'fail' end
 select case when dbo.uuid_v8mssql_from_v7('017F22E2-79B0-7CC3-98C4-DC0C0C07398F') = 'dc0c0c07-398f-848c-b30d-017f22e279b0' then 'pass' else 'fail' end
 
-EXEC sp_set_session_context 'uuidv7.prev_ts', NULL  
-EXEC sp_set_session_context 'uuidv7.calc_ts', NULL
-EXEC sp_set_session_context 'uuidv7.sequence', NULL
+EXEC sp_set_session_context 'uuidv7.state', NULL  
 
 IF OBJECT_ID('UuidFragTest') IS NOT NULL drop table UuidFragTest
 GO

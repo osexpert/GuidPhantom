@@ -415,6 +415,27 @@ namespace GuidPhantom.Tests
 		//	var nsb = v1.ConvertVersion1ToNEWSEQUENTIALID();
 		//	Assert.AreEqual(ns, nsb);
 		//}
+
+		[TestMethod]
+		public void HexString()
+		{
+			// sql tricks
+//			CONVERT(VARCHAR(34), @BINSTR, 1) AS BINSTR_WITH_0x
+//, CONVERT(VARCHAR(34), @BINSTR, 2) AS BINSTR_WITHOUT_0x;
+
+//			select* from UuidAsArrayFragTest where id = CONVERT(binary(16), '0x0191A301A269722899E42A7617EBB6E4', 1)
+//select* from UuidAsArrayFragTest where id = CONVERT(binary(16), '0191A301A269722899E42A7617EBB6E4', 2)
+
+			var g = new Guid("320C3D4D-CC00-875B-8EC9-32D5F69181C0");
+			var hex = g.ToHexString(bigEndian: false);
+			Assert.AreEqual("0x4D3D0C3200CC5B878EC932D5F69181C0", hex);
+			Assert.AreEqual(g, GuidKit.FromHexString(hex, bigEndian: false));
+
+
+			var hex_be = g.ToHexString(bigEndian: true);
+			Assert.AreEqual("0x320C3D4DCC00875B8EC932D5F69181C0", hex_be);
+			Assert.AreEqual(g, GuidKit.FromHexString(hex_be, bigEndian: true));
+		}
 	}
 }
 

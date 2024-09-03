@@ -138,13 +138,13 @@ namespace GuidPhantom
 		}
 
 		/// <summary>
-		///  Create version 6 (same as v1, but bits rearranged to make it ordered)
+		///  Create version 6 (logically the same as v1, but time part rearranged to make it ordered/big endian)
 		/// </summary>
 		/// <returns></returns>
 		public static Guid CreateVersion6() => CreateVersion6(out var _);
 
 		/// <summary>
-		/// Create version 6 (same as v1, but bits rearranged to make it ordered)
+		/// Create version 6 (logically the same as v1, but time part rearranged to make it ordered/big endian)
 		/// </summary>
 		/// <param name="safe">true if generated safely (will be globally unique). false is generated unsafely (only locally unique)</param>
 		/// <returns></returns>
@@ -308,10 +308,10 @@ namespace GuidPhantom
 
 		/// <summary>
 		/// Create monotonicversion 7 Guid.
-		/// NOTE: Monotony breaks if clock goes back in time.
+		/// NOTE: monotony breaks if clock goes back in time.
 		/// NOTE: monotony is only per process.
 		/// 
-		/// This implementation DOES NOT match CreateVersion7 in .NET 9.
+		/// This implementation DOES NOT match CreateVersion7 in .NET 9 (not monotonic):
 		/// https://github.com/dotnet/runtime/blob/59c2ea578bd615a63d56e8ff4b1de0a6b824691f/src/libraries/System.Private.CoreLib/src/System/Guid.cs#L304
 		/// </summary>
 		/// <returns>Version 7 Guid</returns>
@@ -342,12 +342,12 @@ namespace GuidPhantom
 		public static long? Future => _calc_ts - _prev_ts;
 
 		/// <summary>
-		/// Dirty/ulocked read of _counter_bits
+		/// Dirty/ulocked read of _counter_bits. Only for testing.
 		/// </summary>
 		public static int CounterBits => _current_counter_bits;
 
 		/// <summary>
-		/// Dirty/ulocked read of _seq_max
+		/// Dirty/ulocked read of _seq_max. Only for testing.
 		/// </summary>
 		public static int CounterMax => _counter_max;
 
@@ -429,7 +429,10 @@ namespace GuidPhantom
 		}
 
 		/// <summary>
-		/// Same as CreateVersion7 but bits rearranged to make it ordered in MsSql (and then set as Version8)
+		/// Logically the same as CreateVersion7 but bits rearranged to make it ordered in MsSql server.
+		/// Ms sql server has a weird/opposite way of sorting:
+		/// https://stackoverflow.com/questions/7810602/sql-server-guid-sort-algorithm-why
+		/// "More technically, we look at bytes {10 to 15} first, then {8-9}, then {6-7}, then {4-5}, and lastly {0 to 3}."
 		/// </summary>
 		/// <returns>Version8MsSql Guid</returns>
 		public static Guid CreateVersion8MsSql() => CreateVersion7Or8MsSql(DateTimeOffset.UtcNow, 8);
@@ -476,15 +479,6 @@ namespace GuidPhantom
 			}
 		}
 
-		/// <summary>
-		/// Create a Guid where the 6 last bytes is the unix time in milliseconds (v7 has time in the 6 first bytes)
-		/// 
-		/// This will make them sort correctly in ms sql server, that has a weird/opposite way of sorting:
-		/// https://stackoverflow.com/questions/7810602/sql-server-guid-sort-algorithm-why
-		/// "More technically, we look at bytes {10 to 15} first, then {8-9}, then {6-7}, then {4-5}, and lastly {0 to 3}."
-		/// </summary>
-		/// <param name="unix_ts_ms"></param>
-		/// <returns>Version8MsSql Guid</returns>
 		internal static void CreateVersion8MsSql(byte[] bytes, long unix_ts_ms, ref int counter, bool setCounter, byte setBits)
 		{
 			if (unix_ts_ms < 0)
@@ -533,7 +527,6 @@ namespace GuidPhantom
 		/// <param name="namespaceId"></param>
 		/// <param name="name"></param>
 		/// <returns>Version 3 Guid</returns>
-		[SuppressMessage("Security", "CA5350:Do Not Use Weak Cryptographic Algorithms", Justification = "Per spec.")]
 		[SuppressMessage("Security", "CA5351:Do Not Use Broken Cryptographic Algorithms", Justification = "Per spec.")]
 		public static Guid CreateVersion3(this Guid namespaceId, string name)
 		{
@@ -547,7 +540,6 @@ namespace GuidPhantom
 		/// <param name="name"></param>
 		/// <returns>Version 5 Guid</returns>
 		[SuppressMessage("Security", "CA5350:Do Not Use Weak Cryptographic Algorithms", Justification = "Per spec.")]
-		[SuppressMessage("Security", "CA5351:Do Not Use Broken Cryptographic Algorithms", Justification = "Per spec.")]
 		public static Guid CreateVersion5(this Guid namespaceId, string name)
 		{
 			return CreateNamespaceGuid(namespaceId, () => SHA1.Create(), Encoding.UTF8.GetBytes(name), 5);
@@ -562,8 +554,6 @@ namespace GuidPhantom
 		/// <param name="version">The version number of the UUID to create; this value must be either
 		/// 3 (for MD5 hashing) or 5 (for SHA-1 hashing).</param>
 		/// <returns>A UUID derived from the namespace and name.</returns>
-		[SuppressMessage("Security", "CA5350:Do Not Use Weak Cryptographic Algorithms", Justification = "Per spec.")]
-		[SuppressMessage("Security", "CA5351:Do Not Use Broken Cryptographic Algorithms", Justification = "Per spec.")]
 		private static Guid CreateNamespaceGuid(Guid namespaceId, Func<HashAlgorithm> hashAlgo, byte[] nameBytes, byte version)
 		{
 			if (!(version == 3 || version == 5 || version == 8))
@@ -653,6 +643,11 @@ namespace GuidPhantom
 		}
 
 
+		/// <summary>
+		/// Convert from v7 to v8MsSql
+		/// </summary>
+		/// <param name="g_v7"></param>
+		/// <returns></returns>
 		public static Guid ConvertVersion7To8MsSql(this Guid g_v7)
 		{
 			var b = g_v7.ToByteArray(bigEndian: true);
@@ -1019,21 +1014,23 @@ namespace GuidPhantom
 
 		/// <summary>
 		/// Parse eg. 0x01918D8D60A77B77AF4A98D3DF112D66
-		/// or 01918D8D60A77B77AF4A98D3DF112D66
-		/// (with or without 0x prefix)
 		/// Case insensitive.
 		/// </summary>
 		/// <param name="hex"></param>
 		/// <returns></returns>
 		public static Guid FromHexString(string hex, bool bigEndian = true)
 		{
-			if (hex.Length == 16 * 2)
-				return FromByteArray(StringToByteArrayFastest(hex), bigEndian: bigEndian);
+			// or 01918D8D60A77B77AF4A98D3DF112D66
+			// (with or without 0x prefix)
+			
+	//		if (hex.Length == 16 * 2)
+//				return FromByteArray(StringToByteArrayFastest(hex), bigEndian: bigEndian);
 
 			if (hex.Length == 17 * 2 && hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X'))
 				return FromByteArray(StringToByteArrayFastest(hex.Substring(2)), bigEndian: bigEndian);
 
-			throw new ArgumentException("Must be 32 or 34 chars (0x prefixed)");
+			//throw new ArgumentException("Must be 32 or 34 chars (0x prefixed)");
+			throw new ArgumentException("Must be 34 chars (0x prefixed)");
 		}
 
 		private static byte[] StringToByteArrayFastest(string hex)
@@ -1062,5 +1059,42 @@ namespace GuidPhantom
 			return val - (val < 58 ? 48 : (val < 97 ? 55 : 87));
 		}
 
+		/// <summary>
+		/// eg. 0x01918D8D60A77B77AF4A98D3DF112D66
+		/// </summary>
+		/// <param name="g"></param>
+		/// <param name="bigEndian"></param>
+		/// <returns></returns>
+		public static string ToHexString(this Guid g, bool bigEndian = true)
+		{
+			var bytes = g.ToByteArray(bigEndian: bigEndian);
+			return "0x" + ByteArrayToHexViaLookup32(bytes);
+		}
+
+		private static readonly Lazy<uint[]> _lookup32 = new Lazy<uint[]>(CreateLookup32);
+
+		private static uint[] CreateLookup32()
+		{
+			var result = new uint[256];
+			for (int i = 0; i < 256; i++)
+			{
+				string s = i.ToString("X2");
+				result[i] = ((uint)s[0]) + ((uint)s[1] << 16);
+			}
+			return result;
+		}
+
+		private static string ByteArrayToHexViaLookup32(byte[] bytes)
+		{
+			var lookup32 = _lookup32.Value;
+			var result = new char[bytes.Length * 2];
+			for (int i = 0; i < bytes.Length; i++)
+			{
+				var val = lookup32[bytes[i]];
+				result[2 * i] = (char)val;
+				result[2 * i + 1] = (char)(val >> 16);
+			}
+			return new string(result);
+		}
 	}
 }

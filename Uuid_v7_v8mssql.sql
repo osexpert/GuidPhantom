@@ -46,25 +46,44 @@ BEGIN
 	select @utc_now = utc_now, @rand = rand_10 from dbo.uuid_v7_data
 	declare @now_ts bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
-	declare @state binary(20) = convert(binary(20), SESSION_CONTEXT(N'uuidv7.state'))
+	declare @state binary(21) = convert(binary(21), SESSION_CONTEXT(N'uuidv7.state'))
 
 	declare @prev_ts bigint = substring(@state, 1, 8)
 	declare @calc_ts bigint = substring(@state, 9, 8)
 	declare @seq int = substring(@state, 17, 4)
+	declare @bits tinyint = coalesce(substring(@state, 21, 1), 4) -- start_bits
 
 	declare @set_sequence bit = 0
-	if (@now_ts < @prev_ts)
-		set @calc_ts = @now_ts -- clock going back (do not try to handle)
-	else if (@now_ts <= @calc_ts)
+	if (@now_ts < @prev_ts) -- clock going back (do not try to handle)
 	begin
-		set @seq += 1
-		if (@seq > 4095)
+		set @calc_ts = @now_ts
+		set @bits = 4 -- start_bits
+	end
+	else if (@now_ts <= @calc_ts) -- calc_ts is now or in the future
+	begin
+		set @seq += Power(2, 12 - @bits) -- phys_bits
+		if (@seq > 4095) -- seq_max
+		begin
 			set @calc_ts += 1
+			set @bits += 1
+			if (@bits > 12) -- end_bits
+				set @bits = 12 -- end_bits
+		end
 		else
 			set @set_sequence = 1
 	end
-	else
+	else -- calc_ts is in the past
+	begin
 		set @calc_ts = @now_ts
+		if (@now_ts = @prev_ts + 1) -- calm down
+		begin
+			set @bits -= 1
+			if (@bits < 4) -- start_bits
+				set @bits = 4 -- start_bits
+		end
+		else -- reset
+			set @bits = 4 -- start_bits
+	end
 	
 	declare @bytes_6 binary = SUBSTRING(@rand, 1, 1)
 	declare @bytes_7 binary = SUBSTRING(@rand, 2, 1)
@@ -76,16 +95,20 @@ BEGIN
 	-- set variant IETF
 	set @bytes_8 = (@bytes_8 & 63) | 128
 
+	declare @ex_seq int = ((@bytes_6 & 15) * 256) | @bytes_7
+
 	if (@set_sequence = 1)
 	begin
 		if (@seq < 0 or @seq > 4095) set @seq = 42 / 0 -- generate div by zero
-		set @bytes_6 = (@bytes_6 & 240) | ((@seq / 256) & 15)
-		set @bytes_7 = @seq
+		declare @keep_mask int = Power(2, 12 - @bits) - 1
+		declare @new_seq int = (@seq & ~@keep_mask) | (@ex_seq & @keep_mask)
+		set @bytes_6 = (@bytes_6 & 240) | ((@new_seq / 256) & 15)
+		set @bytes_7 = @new_seq
 	end
 	else
-		set @seq = ((@bytes_6 & 15) * 256) | @bytes_7
+		set @seq = @ex_seq
 
-	set @state = cast(@now_ts as binary(8)) + cast(@calc_ts as binary(8)) + cast(@seq as binary(4))
+	set @state = cast(@now_ts as binary(8)) + cast(@calc_ts as binary(8)) + cast(@seq as binary(4)) + cast(@bits as binary(1))
 	-- sp_set_session_context is very slow, so call it as little as possible. Of all the things happening here, this call uses 25% if the time!
 	EXEC sp_set_session_context 'uuidv7.state', @state;
 
@@ -124,25 +147,44 @@ BEGIN
 	select @utc_now = utc_now, @rand = rand_10 from dbo.uuid_v7_data
 	declare @now_ts bigint = DATEDIFF_BIG(ms, '1970-01-01', @utc_now)
 
-	declare @state binary(20) = convert(binary(20), SESSION_CONTEXT(N'uuidv7.state'))
+	declare @state binary(21) = convert(binary(21), SESSION_CONTEXT(N'uuidv7.state'))
 
 	declare @prev_ts bigint = substring(@state, 1, 8)
 	declare @calc_ts bigint = substring(@state, 9, 8)
 	declare @seq int = substring(@state, 17, 4)
+	declare @bits tinyint = coalesce(substring(@state, 21, 1), 4) -- start_bits
 
 	declare @set_sequence bit = 0
-	if (@now_ts < @prev_ts)
-		set @calc_ts = @now_ts -- clock going back (do not try to handle)
-	else if (@now_ts <= @calc_ts)
+	if (@now_ts < @prev_ts) -- clock going back (do not try to handle)
 	begin
-		set @seq += 1
-		if (@seq > 4095)
+		set @calc_ts = @now_ts
+		set @bits = 4 -- start_bits
+	end
+	else if (@now_ts <= @calc_ts) -- calc_ts is now or in the future
+	begin
+		set @seq += Power(2, 12 - @bits) -- phys_bits
+		if (@seq > 4095) -- seq_max
+		begin
 			set @calc_ts += 1
+			set @bits += 1
+			if (@bits > 12) -- bits_end
+				set @bits = 12 -- bits_end
+		end
 		else
 			set @set_sequence = 1
 	end
-	else
+	else -- calc_ts is in the past
+	begin
 		set @calc_ts = @now_ts
+		if (@now_ts = @prev_ts + 1) -- calm down
+		begin
+			set @bits -= 1
+			if (@bits < 4) -- start_bits
+				set @bits = 4 -- start_bits
+		end
+		else -- reset
+			set @bits = 4 -- start_bits
+	end
 
 	declare @bytes_6 binary = SUBSTRING(@rand, 7, 1)
 	declare @bytes_7 binary = SUBSTRING(@rand, 8, 1)
@@ -154,16 +196,20 @@ BEGIN
 	-- set variant IETF
 	set @bytes_8 = (@bytes_8 & 63) | 128
 
+	declare @ex_seq int = ((@bytes_8 & 63) * 64) | ((@bytes_9 & 252) / 4)
+
 	if (@set_sequence = 1)
 	begin
 		if (@seq < 0 or @seq > 4095) set @seq = 42 / 0 -- generate div by zero
-		set @bytes_8 = (@bytes_8 & 192) | ((@seq / 64) & 63)
-		set @bytes_9 = (@bytes_9 & 3) | ((@seq * 4) & 252)
+		declare @keep_mask int = Power(2, 12 - @bits) - 1
+		declare @new_seq int = (@seq & ~@keep_mask) | (@ex_seq & @keep_mask)
+		set @bytes_8 = (@bytes_8 & 192) | ((@new_seq / 64) & 63)
+		set @bytes_9 = (@bytes_9 & 3) | ((@new_seq * 4) & 252)
 	end
 	else
-		set @seq = ((@bytes_8 & 63) * 64) | ((@bytes_9 & 252) / 4)
+		set @seq = @ex_seq
 
-	set @state = cast(@now_ts as binary(8)) + cast(@calc_ts as binary(8)) + cast(@seq as binary(4))
+	set @state = cast(@now_ts as binary(8)) + cast(@calc_ts as binary(8)) + cast(@seq as binary(4)) + cast(@bits as binary(1))
 	-- sp_set_session_context is very slow, so call it as little as possible. Of all the things happening here, this call uses 25% if the time!
 	EXEC sp_set_session_context 'uuidv7.state', @state;
 

@@ -45,7 +45,7 @@ just because they were made during the same timestamp.
 	var inc = GuidKit.CreateIncrementedGuid(new Guid("d2f2f0fe-cbf8-4dc8-9ecb-eedd066dc105"), 42);
 	int inc42 = inc.ReverseIncrementedGuid(new Guid("d2f2f0fe-cbf8-4dc8-9ecb-eedd066dc105"));
 
-Also has sql scripts for ms sql server to create Guid v3, v5, v7, v8mssql and convert between v7 and v8mssql. Currently uses fixed 12bit counter.
+Also has sql scripts for ms sql server to create Guid v3, v5, v7, v8mssql and convert between v7 and v8mssql. Currently uses variable counter, from 4 to 12bits.
 
 v8mssql: Similar to Version 7, but bits reordered to make it ordered as uniqueidentifier in Ms Sql Server.
 Ms Sql Server's uniqueidentifier has strange rules for ordering, so only NEWSEQUENTIALID (non-standard) and v8mssql will be properly ordered.

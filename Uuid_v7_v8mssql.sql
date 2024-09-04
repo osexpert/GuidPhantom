@@ -109,7 +109,7 @@ BEGIN
 		set @seq = @ex_seq
 
 	set @state = cast(@now_ts as binary(8)) + cast(@calc_ts as binary(8)) + cast(@seq as binary(4)) + cast(@bits as binary(1))
-	-- sp_set_session_context is very slow, so call it as little as possible. Of all the things happening here, this call uses 25% if the time!
+	-- sp_set_session_context is very slow, so call it as little as possible. Of all the things happening here, this call uses 25% of the time!
 	EXEC sp_set_session_context 'uuidv7.state', @state;
 
 	declare @time binary(6) = cast(@calc_ts as binary(6))
@@ -210,7 +210,7 @@ BEGIN
 		set @seq = @ex_seq
 
 	set @state = cast(@now_ts as binary(8)) + cast(@calc_ts as binary(8)) + cast(@seq as binary(4)) + cast(@bits as binary(1))
-	-- sp_set_session_context is very slow, so call it as little as possible. Of all the things happening here, this call uses 25% if the time!
+	-- sp_set_session_context is very slow, so call it as little as possible. Of all the things happening here, this call uses 25% of the time!
 	EXEC sp_set_session_context 'uuidv7.state', @state;
 
 	declare @time binary(6) = cast(@calc_ts as binary(6))

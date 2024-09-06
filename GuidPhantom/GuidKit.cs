@@ -18,7 +18,7 @@ namespace GuidPhantom
 		/// https://github.com/dotnet/runtime/blob/59c2ea578bd615a63d56e8ff4b1de0a6b824691f/src/libraries/System.Private.CoreLib/src/System/Guid.cs#L42
 		/// </summary>
 		/// <remarks>This returns the value: FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF</remarks>
-		public static Guid AllBitsSet => new Guid(uint.MaxValue, ushort.MaxValue, ushort.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
+		public static Guid AllBitsSet => new(uint.MaxValue, ushort.MaxValue, ushort.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
 
 
 		[DllImport("libuuid.so.1")]
@@ -119,8 +119,7 @@ namespace GuidPhantom
 			}
 			else
 			{
-				var bytes = new byte[16];
-				var res = uuid_generate_time_safe(out bytes);
+				var res = uuid_generate_time_safe(out var bytes);
 				if (res == 0)
 				{
 					safe = true;
@@ -225,7 +224,7 @@ namespace GuidPhantom
 
 			// order is important!
 			if ((b[8] & 0b1000_0000) == 0)
-				variant = GuidVariant.ApolloNCS;
+				variant = GuidVariant.Apollo;
 			else if ((b[8] & 0b0100_0000) == 0)
 			{
 				// because the above check we know highest bit is 1
@@ -259,11 +258,9 @@ namespace GuidPhantom
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static void SwapBytes(byte[] guid, int a, int b)
+		private static void SwapBytes(byte[] bytes, int a, int b)
 		{
-			var temp = guid[a];
-			guid[a] = guid[b];
-			guid[b] = temp;
+			(bytes[b], bytes[a]) = (bytes[a], bytes[b]);
 		}
 
 
@@ -278,7 +275,7 @@ namespace GuidPhantom
 		/// <param name="bytes"></param>
 		/// <param name="bigEndian"></param>
 		/// <returns>Guid</returns>
-		public static Guid FromByteArray(byte[] bytes, bool bigEndian) => new Guid(bytes, bigEndian);
+		public static Guid FromByteArray(byte[] bytes, bool bigEndian) => new(bytes, bigEndian);
 #else
 		/// <summary>
 		/// Create Guid from byte array
@@ -610,7 +607,7 @@ namespace GuidPhantom
 
 			// Sanity
 			if ((bytes[8] & 0b1100_0000) != 0b0000_0000)
-				throw new InvalidOperationException("Result is not variant " + GuidVariant.ApolloNCS);
+				throw new InvalidOperationException("Result is not variant " + GuidVariant.Apollo);
 
 			return FromByteArray(bytes, bigEndian: true);
 		}
@@ -627,7 +624,7 @@ namespace GuidPhantom
 			var a_or_b_bytes = a_or_b.ToByteArray(bigEndian: true);
 
 			if ((xor_bytes[8] & 0b1100_0000) != 0b0000_0000)
-				throw new InvalidOperationException("xorGuid is not variant " + GuidVariant.ApolloNCS);
+				throw new InvalidOperationException("xorGuid is not variant " + GuidVariant.Apollo);
 			if ((a_or_b_bytes[8] & 0b1100_0000) != 0b1000_0000)
 				throw new InvalidOperationException("a_or_b is not variant " + GuidVariant.IETF);
 
@@ -873,7 +870,7 @@ namespace GuidPhantom
 		/// Get information about a Guid
 		/// </summary>
 		/// <param name="g"></param>
-		/// <param name="version8type"></param>
+		/// <param name="version8type">If Guid is IETF/Version8, treat it as this type</param>
 		/// <returns>Info about the Guid</returns>
 		public static GuidInfo GetGuidInfo(this Guid g, GuidVersion8Type version8type = GuidVersion8Type.Unknown)
 		{
@@ -1071,7 +1068,7 @@ namespace GuidPhantom
 			return "0x" + ByteArrayToHexViaLookup32(bytes);
 		}
 
-		private static readonly Lazy<uint[]> _lookup32 = new Lazy<uint[]>(CreateLookup32);
+		private static readonly Lazy<uint[]> _lookup32 = new(CreateLookup32);
 
 		private static uint[] CreateLookup32()
 		{

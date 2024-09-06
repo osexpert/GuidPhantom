@@ -229,7 +229,7 @@ namespace GuidPhantom.Tests
 			var v7 = GuidKit.CreateVersion7();
 
 			var xor = GuidKit.CreateXorGuid(v1, v7);
-			Assert.AreEqual((GuidVariant.ApolloNCS, null), xor.GetVariantAndVersion());
+			Assert.AreEqual((GuidVariant.Apollo, null), xor.GetVariantAndVersion());
 			Assert.AreEqual(v7, GuidKit.ReverseXorGuid(xor, v1));
 			Assert.AreEqual(v1, GuidKit.ReverseXorGuid(xor, v7));
 

@@ -26,7 +26,7 @@ namespace GuidPhantom
         /// Guid.Empty will be of this variant.
         /// https://segment.com/blog/a-brief-history-of-the-uuid/
         /// </summary>
-        ApolloNCS,
+        Apollo,
         /// <summary>
         /// Variant #1 is what was defined for the joint HP/DEC specification for the OSF
         /// (in DEC's "UID Architecture Functional Specification Version X1.0.4")

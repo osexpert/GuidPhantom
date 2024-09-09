@@ -55,16 +55,18 @@ namespace GuidPhantom
         Reserved,
     }
 
-
-
-  
-
+	/// <summary>
+	/// Pass to GetGuidInfo: how to interpret a version 8 Guid.
+	/// </summary>
     public enum GuidVersion8Type
     {
         Unknown,
         MsSql,
     }
 
+	/// <summary>
+	/// Has variant info
+	/// </summary>
     public class GuidInfo
     {
         public GuidInfo(GuidVariant variant)
@@ -72,16 +74,29 @@ namespace GuidPhantom
             Variant = variant;
         }
 
+		/// <summary>
+		/// Variant
+		/// </summary>
         public GuidVariant Variant { get; }
     }
 
-    public class GuidInfoVersion : GuidInfo
+	/// <summary>
+	/// Has version info.
+	/// Version is only defined for variant IETF, so GuidInfoVersion imply variant IETF
+	/// </summary>
+	public class GuidInfoVersion : GuidInfo
     {
         public GuidInfoVersion(GuidVariant variant, byte version) : base(variant)
         {
+			if (variant != GuidVariant.IETF)
+				throw new ArgumentException("Variant must be IETF");
+
             Version = version;
         }
 
+		/// <summary>
+		/// Version
+		/// </summary>
         public byte Version { get; }
     }
 
@@ -105,7 +120,10 @@ namespace GuidPhantom
         /// </summary>
         public long Timestamp { get; }
 
-        public DateTimeOffset Time => GetTime();
+		/// <summary>
+		/// Timestamp as Time
+		/// </summary>
+		public DateTimeOffset Time => GetTime();
 
         private DateTimeOffset GetTime()
         {
@@ -116,7 +134,7 @@ namespace GuidPhantom
 
 		/// <summary>
 		/// 14bits sequence
-		/// Incremented + 1 or randomized every time
+		/// Incremented + 1 or randomized every time:
 		/// - node changes
 		/// - previously used timestamp is lost (eg. system reboot/power loss)
 		/// - time is adjusted back
@@ -129,8 +147,14 @@ namespace GuidPhantom
 
         byte[] _node;
 
+		/// <summary>
+		/// Node as a string. Example: "00:11:22:AA:BB:FF"
+		/// </summary>
         public string NodeString  => $"{_node[0]:X2}:{_node[1]:X2}:{_node[2]:X2}:{_node[3]:X2}:{_node[4]:X2}:{_node[5]:X2}";
 
+		/// <summary>
+		/// Node as a number
+		/// </summary>
 		public long Node => (long)_node[0] << (5 * 8) |
 			(long)_node[1] << (4 * 8) |
 			(long)_node[2] << (3 * 8) |
@@ -139,7 +163,7 @@ namespace GuidPhantom
 			(long)_node[5];
 
 		/// <summary>
-		/// 6 bytes mac address
+		/// Node as 6 bytes
 		/// </summary>
 		public byte[] GetNodeBytes()
         {
@@ -166,17 +190,20 @@ namespace GuidPhantom
         /// </summary>
         public long Timestamp { get; }
 
-        public DateTimeOffset Time => GetTime();
+		/// <summary>
+		/// Timestamp as Time
+		/// </summary>
+		public DateTimeOffset Time => GetTime();
 
 		/// <summary>
 		/// 12bits
-		/// rand_a can for instance be:
-		/// - random data
-		/// - fractional milliseconds
-		/// - counter (randomly seeded)
+		/// rand_a can be fractional (sub) milliseconds, or something completely different:-)
 		/// </summary>
 		public short RandA { get; }
 
+		/// <summary>
+		/// 62bits
+		/// </summary>
 		public long RandB { get; }
 
 		private DateTimeOffset GetTime(bool add_rand_a_as_sub_milliseconds = false)

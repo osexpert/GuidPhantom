@@ -334,17 +334,17 @@ namespace GuidPhantom
 		static readonly object _lock = new();
 
 		/// <summary>
-		/// Dirty/ulocked read of how far the calculated timestamp is into the future. Only for testing.
+		/// Dirty/unlocked read of how far the calculated timestamp is into the future. Only for diagnostics.
 		/// </summary>
 		public static long? Future => _calc_ts - _prev_ts;
 
 		/// <summary>
-		/// Dirty/ulocked read of _counter_bits. Only for testing.
+		/// Dirty/unlocked read of counter bit count. Only for diagnostics.
 		/// </summary>
-		public static int CounterBits => _current_counter_bits;
+		public static byte CounterBits => _current_counter_bits;
 
 		/// <summary>
-		/// Dirty/ulocked read of _seq_max. Only for testing.
+		/// Dirty/unlocked read of counter max value. Only for diagnostics.
 		/// </summary>
 		public static int CounterMax => _counter_max;
 
@@ -921,7 +921,7 @@ namespace GuidPhantom
 					  (long)b[4] << (1 * 8) |
 					  (long)b[5];
 
-					short seq = (short)(
+					short rand_a = (short)(
 						(b[6] & 0b0000_1111) << 8 |
 						b[7]
 						);
@@ -935,7 +935,7 @@ namespace GuidPhantom
 						(long)b[14] << (1 * 8) |
 						(long)b[15];
 
-					return new GuidInfoVersion7And8(vv.Variant, vv.Version.Value, time, seq, rand_b);
+					return new GuidInfoVersion7And8(vv.Variant, vv.Version.Value, time, rand_a, rand_b);
 				}
 				else if (vv.Version is not null)
 					return new GuidInfoVersion(vv.Variant, vv.Version.Value);
@@ -1017,17 +1017,17 @@ namespace GuidPhantom
 		/// <returns></returns>
 		public static Guid FromHexString(string hex, bool bigEndian = true)
 		{
-			// or 01918D8D60A77B77AF4A98D3DF112D66
-			// (with or without 0x prefix)
-			
-	//		if (hex.Length == 16 * 2)
-//				return FromByteArray(StringToByteArrayFastest(hex), bigEndian: bigEndian);
-
 			if (hex.Length == 17 * 2 && hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X'))
-				return FromByteArray(StringToByteArrayFastest(hex.Substring(2)), bigEndian: bigEndian);
+			{
+#if NET6_0_OR_GREATER
+				var bytes = Convert.FromHexString(hex.Substring(2));
+#else
+				var bytes = StringToByteArrayFastest(hex.Substring(2));
+#endif
+				return FromByteArray(bytes, bigEndian: bigEndian);
+			}
 
-			//throw new ArgumentException("Must be 32 or 34 chars (0x prefixed)");
-			throw new ArgumentException("Must be 34 chars (0x prefixed)");
+			throw new ArgumentException("Must be 34 chars (0x-prefixed)");
 		}
 
 		private static byte[] StringToByteArrayFastest(string hex)
@@ -1065,7 +1065,11 @@ namespace GuidPhantom
 		public static string ToHexString(this Guid g, bool bigEndian = true)
 		{
 			var bytes = g.ToByteArray(bigEndian: bigEndian);
+#if NET6_0_OR_GREATER
+			return "0x" + Convert.ToHexString(bytes);
+#else
 			return "0x" + ByteArrayToHexViaLookup32(bytes);
+#endif
 		}
 
 		private static readonly Lazy<uint[]> _lookup32 = new(CreateLookup32);

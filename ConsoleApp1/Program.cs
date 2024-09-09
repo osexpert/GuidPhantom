@@ -11,11 +11,151 @@ namespace ConsoleApp1
     {
         public static void Main()
         {
-			while (true)
+			void test()
 			{
-				var v777 = GuidKit.CreateVersion7();
-				Console.WriteLine("" + v777 + ", " + GuidKit.CounterBits + " fut:" + GuidKit.Future);
+				Console.WriteLine($"Future: {GuidKit.Future}, CounterBits: {GuidKit.CounterBits}");
+
+				var g1 = GuidKit.CreateVersion7();
+				var g2 = GuidKit.CreateVersion7();
+				var g3 = GuidKit.CreateVersion7();
+
+				Console.WriteLine("" + g1);
+				Console.WriteLine("" + g2);
+				Console.WriteLine("" + g3);
+
+				Console.WriteLine($"Future: {GuidKit.Future}, CounterBits: {GuidKit.CounterBits}");
+				Thread.Sleep(10);
+				GuidKit.CreateVersion7();
+				Thread.Sleep(10);
+				Console.WriteLine($"Future: {GuidKit.Future}, CounterBits: {GuidKit.CounterBits}");
+
+				var s = Stopwatch.StartNew();
+				Guid? last = null;
+				for (int i = 0; i <= 100_000_000; i++)
+				{
+					var gl = GuidKit.CreateVersion7();
+					if (i == 100_000_000)
+						last = gl;
+				}
+				var now = DateTimeOffset.UtcNow;
+				s.Stop();
+
+				Console.WriteLine($"now: {now.ToString("O")}, last time {((GuidInfoVersion7And8)last!.Value.GetGuidInfo()).Time.ToString("O")}, Future: {GuidKit.Future}, CounterBits: {GuidKit.CounterBits}");
+
+				Console.WriteLine($"elapsed millis: {s.ElapsedMilliseconds}");
 			}
+			void testGuidNew()
+			{
+				var g1 = Guid.NewGuid();
+				var g2 = Guid.NewGuid();
+				var g3 = Guid.NewGuid();
+
+				Console.WriteLine("" + g1);
+				Console.WriteLine("" + g2);
+				Console.WriteLine("" + g3);
+
+				var s = Stopwatch.StartNew();
+				Guid? last = null;
+				for (int i = 0; i <= 100_000_000; i++)
+				{
+					var gl = Guid.NewGuid();
+					if (i == 100_000_000)
+						last = gl;
+				}
+				var now = DateTimeOffset.UtcNow;
+				s.Stop();
+
+				//Console.WriteLine($"now: {now.ToString("O")}, last time {((GuidInfoVersion7And8)last!.Value.GetGuidInfo()).Time.ToString("O")}, Future: {GuidKit.Future}, CounterBits: {GuidKit.CounterBits}");
+
+				Console.WriteLine($"elapsed millis: {s.ElapsedMilliseconds}");
+			}
+
+			void testUlid()
+			{
+				int beforeAt = 0;
+				int after = 0;
+				
+
+				var g1 = Ulid.NewUlid();
+				var g2 = Ulid.NewUlid();
+				var g3 = Ulid.NewUlid();
+
+				Console.WriteLine("" + g1);
+				Console.WriteLine("" + g2);
+				Console.WriteLine("" + g3);
+
+				var s = Stopwatch.StartNew();
+				Ulid? last = null;
+				for (int i = 0; i <= 100_000_000; i++)
+				{
+					var gl = Ulid.NewUlid();
+
+					if (last != null)
+					{
+						if (gl.CompareTo(last.Value) <= 0)
+						{
+							beforeAt++;
+						}
+						else
+						{
+							after++;
+						}
+					}
+					last = gl;
+					//if (i == 100_000_000)
+//						last = gl;
+				}
+				var now = DateTimeOffset.UtcNow;
+				s.Stop();
+
+				Console.WriteLine($"beforeAt: {beforeAt}, after: {after}");
+
+				Console.WriteLine($"now: {now.ToString("O")}, last time {last!.Value.Time.ToString("O")}");
+
+				Console.WriteLine($"elapsed millis: {s.ElapsedMilliseconds}");
+			}
+
+			void testUuidnext()
+			{
+				var g1 = UUIDNext.Uuid.NewSequential();
+				var g2 = UUIDNext.Uuid.NewSequential();
+				var g3 = UUIDNext.Uuid.NewSequential();
+
+				Console.WriteLine("" + g1);
+				Console.WriteLine("" + g2);
+				Console.WriteLine("" + g3);
+
+				var s = Stopwatch.StartNew();
+				Guid? last = null;
+				for (int i = 0; i <= 100_000_000; i++)
+				{
+					var gl = UUIDNext.Uuid.NewSequential();
+
+					if (last != null)
+					{
+						if (gl.CompareTo(last.Value) <= 0)
+							throw new Exception("not monotonic");
+					}
+					last = gl;
+					//if (i == 100_000_000)
+					//						last = gl;
+				}
+				var now = DateTimeOffset.UtcNow;
+				s.Stop();
+
+				Console.WriteLine($"now: {now.ToString("O")}, last time {((GuidInfoVersion7And8)last!.Value.GetGuidInfo()).Time.ToString("O")}");
+
+				Console.WriteLine($"elapsed millis: {s.ElapsedMilliseconds}");
+			}
+
+			test();
+			test();
+
+			//while (true)
+			//{
+			//	var v777 = GuidKit.CreateVersion7();
+			//	Console.WriteLine("" + v777 + ", " + GuidKit.CounterBits + " fut:" + GuidKit.Future);
+			//}
 
 			//long i2 = 0;
 			//long collnum = 0;

@@ -304,9 +304,9 @@ namespace GuidPhantom
 		public static Guid CreateVersion4() => Guid.NewGuid();
 
 		/// <summary>
-		/// Create monotonicversion 7 Guid.
-		/// NOTE: monotony breaks if clock goes back in time.
-		/// NOTE: monotony is only per process.
+		/// Create monotonic version 7 Guid.<br/>
+		/// NOTE: monotony breaks if clock goes back in time.<br/>
+		/// NOTE: monotony is per process.<br/>
 		/// 
 		/// This implementation DOES NOT match CreateVersion7 in .NET 9 (not monotonic):
 		/// https://github.com/dotnet/runtime/blob/59c2ea578bd615a63d56e8ff4b1de0a6b824691f/src/libraries/System.Private.CoreLib/src/System/Guid.cs#L304

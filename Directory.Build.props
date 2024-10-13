@@ -19,7 +19,7 @@
     <PackageReleaseNotes></PackageReleaseNotes>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Company>osexpert</Company>      
-    <PackageReleaseNotes>See https://github.com/osexpert/GuidPhantom/blob/master/CHANGELOG.md for details</PackageReleaseNotes>
+    <PackageReleaseNotes>See https://github.com/osexpert/GuidPhantom/blob/main/CHANGELOG.md for details</PackageReleaseNotes>
     
     <VersionPrefix>0.0.7</VersionPrefix>
     <PackageTags>guid uuid</PackageTags>

@@ -126,6 +126,7 @@ RETURNS uniqueidentifier
 WITH EXECUTE AS CALLER
 AS
 BEGIN
+	declare @dummy datetime2 = SYSDATETIME(); -- trick ms sql into reevaluating the function when doing eg. joins
 -- PS: seems to be a bug in ms sql. If these two function calls are combined in the same statement, stuff are executed out of order... Its a mystery.
 -- Splitting them and the problem is gone...
 	declare @uuid binary(16) = dbo.uuid_v7_array()
@@ -224,6 +225,7 @@ RETURNS uniqueidentifier
 WITH EXECUTE AS CALLER
 AS
 BEGIN
+	declare @dummy datetime2 = SYSDATETIME(); -- trick ms sql into reevaluating the function when doing eg. joins
 -- PS: seems to be a bug in ms sql. If these two function calls are combined in the same statement, stuff are executed out of order... Its a mystery.
 -- Splitting them and the problem is gone...
 	declare @uuid binary(16) = dbo.uuid_v8mssql_array()

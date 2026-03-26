@@ -22,7 +22,7 @@ namespace GuidPhantom
 
 
 		[DllImport("libuuid.so.1")]
-		private static extern int uuid_generate_time_safe(out byte[] bytes);
+		private static extern int uuid_generate_time_safe([Out] byte[] bytes);
 
 		[DllImport("rpcrt4.dll")]
 		private static extern int UuidCreateSequential(out Guid guid);
@@ -119,7 +119,8 @@ namespace GuidPhantom
 			}
 			else
 			{
-				var res = uuid_generate_time_safe(out var bytes);
+				var bytes = new byte[16];
+				var res = uuid_generate_time_safe(bytes);
 				if (res == 0)
 				{
 					safe = true;
@@ -314,7 +315,7 @@ namespace GuidPhantom
 		/// <returns>Version 7 Guid</returns>
 		public static Guid CreateVersion7() => CreateVersion7Or8MsSql(DateTimeOffset.UtcNow, 7);
 
-
+		// null means "no previous call yet"; nullable comparison semantics handle the first-call case correctly
 		static long? _prev_ts = null;
 		static long? _calc_ts = null;
 		static int _counter = 0;
@@ -472,6 +473,7 @@ namespace GuidPhantom
 			}
 			else
 			{
+				// Seed counter from random bits of the fresh Guid (new timestamp slot)
 				counter = ex_counter;
 			}
 		}
@@ -514,6 +516,7 @@ namespace GuidPhantom
 			}
 			else
 			{
+				// Seed counter from random bits of the fresh Guid (new timestamp slot)
 				counter = ex_counter;
 			}
 		}

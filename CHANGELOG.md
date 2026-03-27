@@ -1,3 +1,6 @@
+## 0.0.8
+* Fix crash in CreateVersion1() on Linux (uuid_generate_time_safe incorrect marshal)
+
 ## 0.0.7
 * Change dynamic/variable counter: 4-18bits
 * Add 'back off' logic: when on the 'edge', gradually reduce number of bits instead of going straight back to 4 bits.

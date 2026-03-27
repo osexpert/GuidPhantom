@@ -1,4 +1,4 @@
-name: .NET Tests (Linux)
+name: .NET 8 Tests (Linux + Windows)
 
 on:
   push:
@@ -8,22 +8,25 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Setup .NET
+    - name: Setup .NET 8
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'   # change if needed
+        dotnet-version: '8.0.x'
 
-    - name: Restore dependencies
-      run: dotnet restore
+    - name: Restore
+      run: dotnet restore GuidPhantom.Tests/GuidPhantom.Tests.csproj
 
-    - name: Build
-      run: dotnet build --configuration Release --no-restore
+    - name: Build (net8 only)
+      run: dotnet build GuidPhantom.Tests/GuidPhantom.Tests.csproj --framework net8.0 --configuration Release --no-restore
 
-    - name: Run tests
-      run: dotnet test GuidPhantom.Tests/GuidPhantom.Tests.csproj --configuration Release --no-build --verbosity normal --framework net8.0
+    - name: Test (net8 only)
+      run: dotnet test GuidPhantom.Tests/GuidPhantom.Tests.csproj --framework net8.0 --configuration Release --no-build

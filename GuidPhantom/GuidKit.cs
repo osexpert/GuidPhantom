@@ -22,7 +22,7 @@ namespace GuidPhantom
 
 
 		[DllImport("libuuid.so.1")]
-		private static extern int uuid_generate_time_safe(out byte[] bytes);
+		private static extern int uuid_generate_time_safe([Out] byte[] bytes);
 
 		[DllImport("rpcrt4.dll")]
 		private static extern int UuidCreateSequential(out Guid guid);
@@ -119,8 +119,8 @@ namespace GuidPhantom
 			}
 			else
 			{
-				//var bytes = new byte[16];
-				var res = uuid_generate_time_safe(out var bytes);
+				var bytes = new byte[16];
+				var res = uuid_generate_time_safe(bytes);
 				if (res == 0)
 				{
 					safe = true;

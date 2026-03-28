@@ -91,15 +91,11 @@ Uuid.NewSequential()
 019d33c0-6a42-7619-8290-de35eef23179
 </pre>
 
-Lets break it down:
+Lets break it down:<br />
+The rand_a field is the key: UUID v7 structure: [48-bit ms timestamp]-[ver][12-bit rand_a]-[var][62-bit rand_b]<br />
+When multiple UUIDs are generated within the same millisecond, monotonicity depends entirely on what goes in rand_a.<br />
 
-
-The rand_a field is the key: UUID v7 structure: [48-bit ms timestamp]-[ver][12-bit rand_a]-[var][62-bit rand_b]
-
-When multiple UUIDs are generated within the same millisecond, monotonicity depends entirely on what goes in rand_a.
-
-GuidKit.CreateVersion7() — random monotonic ✅
-
+GuidKit.CreateVersion7() — random monotonic ✅<br />
 The rand_a bits increment each call:
 <pre>
 019d33c0-6a34-71fb  →  7[1fb]
@@ -107,16 +103,16 @@ The rand_a bits increment each call:
 019d33c0-6a34-729c  →  7[29c]
 019d33c0-6a34-7369  →  7[369]  ← counter
 </pre>
-Uuid.NewSequential() — strictly monotonic ✅
 
+Uuid.NewSequential() — strictly monotonic ✅<br />
 Even more obvious — it's just incrementing by 1:
 <pre>
 019d33c0-6a42-7610
 019d33c0-6a42-7611
 019d33c0-6a42-7612  ← +1 counter
 </pre>
-Guid.CreateVersion7() — NOT monotonic ❌
 
+Guid.CreateVersion7() — NOT monotonic ❌<br />
 All same millisecond (6a42), but rand_a is random each time:
 <pre>
 019d33c0-6a42-7e91

@@ -127,9 +127,9 @@ All same millisecond (6a42), but rand_a is random each time:
 
 RFC 9562 (the UUID v7 spec) permits but does not require a monotonic counter in rand_a. 
 It offers three methods for same-millisecond ordering:
-* Method 1 Fixed-length counter (what GuidKit/Sequential do)
-* Method 2 Monotonic random (increment by random amount)
-* Method 3 Re-seed randomly each time ← this is what .NET does
+* Method 1 Fixed-length counter (Uuid.NewSequential())
+* Method 2 Monotonic random (increment by random amount - GuidKit.CreateVersion7())
+* Method 3 Re-seed randomly each time (what .NET does)
 .NET's Guid.CreateVersion7() deliberately chose Method 3 — it re-randomizes rand_a every call.
 This is spec-compliant, but means same-millisecond UUIDs have no guaranteed sort order.
 It was a conscious tradeoff: simpler implementation, no shared counter state, but no sub-ms monotonicity.

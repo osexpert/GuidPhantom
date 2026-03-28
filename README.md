@@ -54,6 +54,87 @@ Ms Sql Server's uniqueidentifier has strange rules for ordering, so only NEWSEQU
 It is possible to use Version 7 stored as a binary(16) for proper ordering, if stored as big endian. Can either use big endian byte array's directly from client,
 or send Guid/uniqueidentifier from the client and convert to byte array in sql, then need to use eg. dbo.uuid_swap_endian(...), to make it big endian.
 
+Analysis:
+<pre>
+GuidKit.CreateVersion7()
+019d33c0-6a33-7e03-8cb9-6a24c0e84f80
+019d33c0-6a33-7fd4-b819-a0c2a1e455e6
+019d33c0-6a34-71fb-9e10-684a1d50e0f5
+019d33c0-6a34-7266-b223-efb917ec2c3f
+019d33c0-6a34-729c-ac00-53b7c29e3b53
+019d33c0-6a34-7369-8e29-c45d40b8ddce
+019d33c0-6a34-73a7-b1ae-ea7a91255842
+019d33c0-6a34-741e-8724-ea8d1b0a93bc
+019d33c0-6a34-74ae-99be-8632e7b20eea
+019d33c0-6a34-752f-a2ff-53e4b9978e27
+Guid.CreateVersion7()
+019d33c0-6a42-7e91-81a2-105dec7df176
+019d33c0-6a42-74c2-a949-00ecfea193a1
+019d33c0-6a42-72f9-b157-90b8869235dd
+019d33c0-6a42-7967-ac17-06dbbfef8795
+019d33c0-6a42-7418-bfe4-56e1d18a1f7e
+019d33c0-6a42-7cab-b57c-4e0b0951d4e5
+019d33c0-6a42-7f1a-8b27-2fa46539de67
+019d33c0-6a42-7a06-9a69-f5465c8ebfc8
+019d33c0-6a42-733a-862e-75a5615b6fd4
+019d33c0-6a42-7fa5-95c0-0184bdf3b600
+Uuid.NewSequential()
+019d33c0-6a42-7610-91cf-ec81a655d219
+019d33c0-6a42-7611-bfb0-7b2d2e3c2ca2
+019d33c0-6a42-7612-b0fa-6c238463e879
+019d33c0-6a42-7613-919b-0035ef46ba3e
+019d33c0-6a42-7614-9686-48c1207da8ef
+019d33c0-6a42-7615-bd19-8a2aa0cc1cae
+019d33c0-6a42-7616-afa5-7363b3dc8fe4
+019d33c0-6a42-7617-b40f-9a12e735b24f
+019d33c0-6a42-7618-b9a7-7c17e057127c
+019d33c0-6a42-7619-8290-de35eef23179
+</pre>
+
+Lets break it down:
+
+
+The rand_a field is the key: UUID v7 structure: [48-bit ms timestamp]-[ver][12-bit rand_a]-[var][62-bit rand_b]
+
+When multiple UUIDs are generated within the same millisecond, monotonicity depends entirely on what goes in rand_a.
+
+GuidKit.CreateVersion7() — random monotonic ✅
+
+The rand_a bits increment each call:
+<pre>
+019d33c0-6a34-71fb  →  7[1fb]
+019d33c0-6a34-7266  →  7[266]
+019d33c0-6a34-729c  →  7[29c]
+019d33c0-6a34-7369  →  7[369]  ← counter
+</pre>
+Uuid.NewSequential() — strictly monotonic ✅
+
+Even more obvious — it's just incrementing by 1:
+<pre>
+019d33c0-6a42-7610
+019d33c0-6a42-7611
+019d33c0-6a42-7612  ← +1 counter
+</pre>
+Guid.CreateVersion7() — NOT monotonic ❌
+
+All same millisecond (6a42), but rand_a is random each time:
+<pre>
+019d33c0-6a42-7e91
+019d33c0-6a42-74c2
+019d33c0-6a42-72f9  ← pure random
+019d33c0-6a42-7967
+</pre>
+
+RFC 9562 (the UUID v7 spec) permits but does not require a monotonic counter in rand_a. 
+It offers three methods for same-millisecond ordering:
+* Method 1 Fixed-length counter (what GuidKit/Sequential do)
+* Method 2 Monotonic random (increment by random amount)
+* Method 3 Re-seed randomly each time ← this is what .NET does
+.NET's Guid.CreateVersion7() deliberately chose Method 3 — it re-randomizes rand_a every call.
+This is spec-compliant, but means same-millisecond UUIDs have no guaranteed sort order.
+It was a conscious tradeoff: simpler implementation, no shared counter state, but no sub-ms monotonicity.
+If you need database-friendly sortable UUIDs (e.g. for clustered index inserts), GuidKit or Uuid.NewSequential() are the better choices.
+
 References:
 * https://zendesk.engineering/how-probable-are-collisions-with-ulids-monotonic-option-d604d3ed2de
 * https://github.com/mareek/UUIDNext
